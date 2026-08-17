@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的持仓 · 模拟盘</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="page-head">
+    <div>
+      <h1>我的持仓</h1>
+      <div class="sub">实时估值 · 含浮动盈亏与持仓占比</div>
+    </div>
+    <div>
+      <button class="btn ghost" onclick="location.href='/sim'">去交易</button>
+      <button class="btn" onclick="load()">刷新</button>
+    </div>
+  </div>
+
+  <div class="stat-grid" id="account-stats"></div>
+
+  <div class="panel">
+    <div class="panel-title"><h2>个股持仓</h2></div>
+    <div class="table-wrap"><table id="stock-pos"><thead><tr>
+      <th>代码</th><th>名称</th><th>股数</th><th>成本价</th><th>现价</th><th>市值</th><th>占比</th><th>浮动盈亏</th><th>盈亏率</th><th>已实现</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><h2>基金持仓</h2></div>
+    <div class="table-wrap"><table id="fund-pos"><thead><tr>
+      <th>代码</th><th>名称</th><th>类型</th><th>份额</th><th>成本价</th><th>现值/净值</th><th>市值</th><th>占比</th><th>浮动盈亏</th><th>盈亏率</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+</div>
+
+<script src="/static/common.js"></script>
+<script>
+App.mount('sim');
+
+function sym(code) {
+  const h = code.slice(0, 1);
+  return (h === '6' || h === '9') ? 'sh' + code : 'sz' + code;
+}
+function pnlCell(pnl, pct) {
+  const cls = App.chgClass(pnl);
+  return `<span class="${cls}">${App.fmtNum(pnl)} (${App.fmtPct(pct)})</span>`;
+}
+
+async function load() {
+  try {
+    const d = await App.api('/sim/summary');
+    renderAccount(d.account);
+    renderStocks(d.stock_positions || [], d.account.total_asset);
+    renderFunds(d.fund_positions || [], d.account.total_asset);
+  } catch (e) {
+    if (e.message.indexOf('登录') >= 0) { location.href = '/sim'; return; }
+    App.toast(e.message);
+  }
+}
+
+function renderAccount(a) {
+  const pnlCls = App.chgClass(a.total_pnl);
+  const mv = a.total_asset - a.cash_balance;
+  document.getElementById('account-stats').innerHTML = `
+    <div class="stat"><div class="label">总资产</div><div class="value">¥${App.fmtNum(a.total_asset)}</div></div>
+    <div class="stat"><div class="label">可用资金</div><div class="value">¥${App.fmtNum(a.cash_balance)}</div></div>
+    <div class="stat"><div class="label">持仓市值</div><div class="value">¥${App.fmtNum(mv)}</div></div>
+    <div class="stat"><div class="label">总盈亏</div><div class="value ${pnlCls}">${App.fmtNum(a.total_pnl)}</div><div class="delta ${pnlCls}">${App.fmtPct(a.total_pnl_pct)}</div></div>
+    <div class="stat"><div class="label">初始资金</div><div class="value">¥${App.fmtNum(a.initial_capital)}</div></div>
+    <div class="stat"><div class="label">持仓数</div><div class="value">${a.position_count}</div></div>`;
+}
+
+function renderStocks(list, total) {
+  const tb = document.querySelector('#stock-pos tbody');
+  tb.innerHTML = list.length ? list.map(p => {
+    const ratio = total ? (p.market_value / total * 100) : 0;
+    return `<tr>
+      <td><span class="tlink" onclick="location.href='/stock?symbol=${sym(p.stock_code)}'">${p.stock_code}</span></td>
+      <td>${App.escapeHtml(p.stock_name || '')}</td>
+      <td>${App.fmtNum(p.shares, 0)}</td>
+      <td>${App.fmtNum(p.avg_cost)}</td>
+      <td>${App.fmtNum(p.current_price)}</td>
+      <td>¥${App.fmtNum(p.market_value)}</td>
+      <td>${ratio.toFixed(1)}%</td>
+      <td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td>
+      <td>${App.fmtPct(p.floating_pnl_pct)}</td>
+      <td>${App.fmtNum(p.realized_pnl)}</td></tr>`;
+  }).join('') : '<tr><td colspan="10" class="center muted">暂无个股持仓</td></tr>';
+}
+
+function renderFunds(list, total) {
+  const tb = document.querySelector('#fund-pos tbody');
+  tb.innerHTML = list.length ? list.map(p => {
+    const ratio = total ? (p.market_value / total * 100) : 0;
+    return `<tr>
+      <td><span class="tlink" onclick="location.href='/fund?code=${p.fund_code}&mt=${p.market_type}'">${p.fund_code}</span></td>
+      <td>${App.escapeHtml(p.fund_name || '')}</td>
+      <td><span class="tag ${p.market_type}">${p.market_type === 'on' ? '场内' : '场外'}</span></td>
+      <td>${App.fmtNum(p.shares)}</td>
+      <td>${App.fmtNum(p.avg_cost)}</td>
+      <td>${App.fmtNum(p.current_price)}</td>
+      <td>¥${App.fmtNum(p.market_value)}</td>
+      <td>${ratio.toFixed(1)}%</td>
+      <td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td>
+      <td>${App.fmtPct(p.floating_pnl_pct)}</td></tr>`;
+  }).join('') : '<tr><td colspan="10" class="center muted">暂无基金持仓</td></tr>';
+}
+
+load();
+</script>
+</body>
+</html>
