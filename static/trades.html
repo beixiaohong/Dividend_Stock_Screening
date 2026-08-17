@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易记录 · 模拟盘</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="page-head">
+    <div>
+      <h1>交易记录</h1>
+      <div class="sub">模拟盘全部成交流水</div>
+    </div>
+    <div>
+      <button class="btn ghost" onclick="location.href='/sim'">去交易</button>
+      <button class="btn" onclick="load()">刷新</button>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="seg">
+      <button data-group="type" data-val="all" class="active" onclick="setFilter('type','all',this)">全部</button>
+      <button data-group="type" data-val="stock" onclick="setFilter('type','stock',this)">个股</button>
+      <button data-group="type" data-val="fund" onclick="setFilter('type','fund',this)">基金</button>
+    </div>
+    <div class="seg">
+      <button data-group="side" data-val="all" class="active" onclick="setFilter('side','all',this)">全部</button>
+      <button data-group="side" data-val="buy" onclick="setFilter('side','buy',this)">买入</button>
+      <button data-group="side" data-val="sell" onclick="setFilter('side','sell',this)">卖出</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="muted" id="summary"></div>
+  </div>
+
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap"><table id="trades"><thead><tr>
+      <th>时间</th><th>类型</th><th>方向</th><th>市场</th><th>代码</th><th>名称</th>
+      <th>成交价</th><th>数量/份额</th><th>成交额</th><th>费用</th><th>余额</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+</div>
+
+<script src="/static/common.js"></script>
+<script>
+App.mount('sim');
+
+let allTrades = [];
+let fType = 'all', fSide = 'all';
+
+function sym(code) {
+  const h = code.slice(0, 1);
+  return (h === '6' || h === '9') ? 'sh' + code : 'sz' + code;
+}
+
+async function load() {
+  try {
+    allTrades = await App.api('/sim/trades?limit=1000');
+    render();
+  } catch (e) {
+    if (e.message.indexOf('登录') >= 0) { location.href = '/sim'; return; }
+    App.toast(e.message);
+  }
+}
+
+function setFilter(kind, val, btn) {
+  if (kind === 'type') fType = val; else fSide = val;
+  document.querySelectorAll('[data-group="' + kind + '"]').forEach(b =>
+    b.classList.toggle('active', b === btn));
+  render();
+}
+
+function render() {
+  const list = allTrades.filter(t =>
+    (fType === 'all' || t.asset_type === fType) && (fSide === 'all' || t.side === fSide));
+
+  let buy = 0, sell = 0, fee = 0;
+  list.forEach(t => {
+    if (t.side === 'buy') buy += (t.amount || 0); else sell += (t.amount || 0);
+    fee += (t.fee || 0);
+  });
+  document.getElementById('summary').textContent =
+    `共 ${list.length} 笔 · 买入额 ¥${App.fmtNum(buy)} · 卖出额 ¥${App.fmtNum(sell)} · 手续费 ¥${App.fmtNum(fee)}`;
+
+  const tb = document.querySelector('#trades tbody');
+  tb.innerHTML = list.length ? list.map(t => {
+    const link = t.asset_type === 'stock'
+      ? `<span class="tlink" onclick="location.href='/stock?symbol=${sym(t.code)}'">${t.code}</span>`
+      : `<span class="tlink" onclick="location.href='/fund?code=${t.code}&mt=${t.market_type || 'off'}'">${t.code}</span>`;
+    const mkt = t.asset_type === 'fund' ? (t.market_type === 'on' ? '场内' : '场外') : '—';
+    return `<tr>
+      <td>${App.fmtTime(t.created_at)}</td>
+      <td>${t.asset_type === 'stock' ? '个股' : '基金'}</td>
+      <td class="${t.side === 'buy' ? 'up' : 'down'}">${t.side === 'buy' ? '买入' : '卖出'}</td>
+      <td>${mkt}</td>
+      <td>${link}</td>
+      <td>${App.escapeHtml(t.name || '')}</td>
+      <td>${App.fmtNum(t.price)}</td>
+      <td>${App.fmtNum(t.shares)}</td>
+      <td>¥${App.fmtNum(t.amount)}</td>
+      <td>${App.fmtNum(t.fee)}</td>
+      <td>${App.fmtNum(t.cash_after)}</td></tr>`;
+  }).join('') : '<tr><td colspan="11" class="center muted">暂无交易记录</td></tr>';
+}
+
+load();
+</script>
+</body>
+</html>
