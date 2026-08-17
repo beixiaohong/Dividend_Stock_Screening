@@ -55,7 +55,7 @@ def normalize_code(code: str) -> str:
 class StockQuote:
     """归一化后的单只股票行情。
 
-    字段命名与 backend.model.model_stock_screening.DailyMarketData 的列式尽量对齐，
+    字段命名与 models.stock.DailyMarketData 的列式尽量对齐，
     方便直接落库。成交量统一为"手"（1 手 = 100 股），成交额单位为"元"。
     """
 

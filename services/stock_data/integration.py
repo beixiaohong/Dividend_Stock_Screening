@@ -1,10 +1,8 @@
-"""与现有数据库 / 业务层的集成适配。
+"""把多源股票数据客户端（stock_data.client）产出的 StockQuote / Kline，
+upsert 到本项目的 db_stock_daily_market / historical_data 表。
 
-把多源股票数据客户端（stock_data.client）产出的 StockQuote / Kline，
-upsert 到现有表 db_stock_daily_market / db_stock_historical。
-
-所有对 backend.model 的导入都是"惰性"的：本模块被 import 时不会触发
-数据库相关依赖，方便在无 DB 环境（如单元测试）下直接引用 client。
+对 ORM 模型与会话的导入是"惰性"的：本模块被 import 时不会触发数据库
+相关依赖，方便在无 DB 环境（如单元测试）下直接引用 client。
 """
 
 from __future__ import annotations
@@ -17,9 +15,9 @@ from .models import StockQuote, Kline, normalize_code
 
 
 def _get_models():
-    """惰性加载 ORM 模型与会话。"""
-    from backend.model.database import SessionLocal
-    from backend.model.model_stock_screening import (
+    """惰性加载 ORM 模型与会话（指向本项目真实模块）。"""
+    from core.database import SessionLocal
+    from models.stock import (
         DailyMarketData,
         HistoricalData,
     )
