@@ -47,8 +47,6 @@
   </div>
 </div>
 
-<div id="modal-root"></div>
-
 <script src="/static/common.js"></script>
 <script src="/static/charts.js"></script>
 <script>
@@ -145,7 +143,7 @@ function card(it) {
     ? `<div class="${cls}" style="font-size:13px;">${it.change_amount >= 0 ? '+' : ''}${App.fmtNum(it.change_amount)}</div>` : '';
   const tag = (it.category === 'fund')
     ? `<span class="tag ${it.market_type}">${it.market_type === 'on' ? '场内' : '场外'}</span>` : '';
-  return `<div class="quote-card" onclick="openDetail(${idx})">
+  return `<div class="quote-card" onclick="goDetail(${idx})">
     <div class="qbar ${cls}"></div>
     <div class="qname">${App.escapeHtml(it.name)} ${tag}</div>
     <div class="qcode">${App.escapeHtml(it.code)}</div>
@@ -154,79 +152,17 @@ function card(it) {
   </div>`;
 }
 
-// ---------------- 详情模态 ----------------
-function showModal(html) {
-  document.getElementById('modal-root').innerHTML =
-    `<div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
-       <div class="modal"><span class="close" onclick="closeModal()">×</span>${html}</div>
-     </div>`;
+// ---------------- 详情跳转 ----------------
+function detailUrl(it) {
+  if (it.category === 'fund')
+    return '/fund?code=' + encodeURIComponent(it.code) + '&mt=' + encodeURIComponent(it.market_type || 'off');
+  if (it.category === 'index')
+    return '/index?symbol=' + encodeURIComponent(it.symbol);
+  return '/stock?symbol=' + encodeURIComponent(it.symbol); // 股票 / ETF
 }
-function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
-
-function openDetail(arg) {
-  const it = (typeof arg === 'number') ? _cardReg[arg] : arg;
-  if (it.category === 'fund' && it.market_type === 'off') return openFundDetail(it);
-  const sym = it.symbol;
-  if (!sym) { App.toast('该标的暂无实时行情'); return; }
-  showModal('<div id="detail-body"><div class="empty">加载中…</div></div>');
-  (async () => {
-    try {
-      const q = await App.api('/market/quote?symbol=' + sym);
-      let kl = [];
-      try { kl = await App.api('/market/kline?symbol=' + sym + '&count=60'); } catch (e) {}
-      renderQuoteDetail(it, q, kl);
-    } catch (e) {
-      document.getElementById('detail-body').innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>';
-    }
-  })();
-}
-
-function renderQuoteDetail(it, q, kl) {
-  const cls = App.chgClass(q.change_pct);
-  const stats = [
-    ['今开', App.fmtNum(q.open)], ['最高', App.fmtNum(q.high)],
-    ['最低', App.fmtNum(q.low)], ['昨收', App.fmtNum(q.prev_close)],
-    ['成交额', q.amount ? App.fmtNum(q.amount / 1e8, 2) + '亿' : '--'],
-    ['换手率', q.turnover_rate ? App.fmtPct(q.turnover_rate) : '--'],
-    ['市盈率', q.pe != null ? App.fmtNum(q.pe) : '--'],
-    ['市净率', q.pb != null ? App.fmtNum(q.pb) : '--'],
-  ].map(([k, v]) => `<div class="stat"><div class="label">${k}</div><div class="value" style="font-size:15px;">${v}</div></div>`).join('');
-
-  const series = (kl || []).map(k => ({ label: k.date.slice(5), value: k.close }));
-  document.getElementById('detail-body').innerHTML = `
-    <h3>${App.escapeHtml(q.name)} <span class="muted" style="font-size:13px;font-weight:400;">${App.escapeHtml(q.code)}</span></h3>
-    <div style="display:flex;align-items:baseline;gap:12px;margin:6px 0 14px;">
-      <div class="qprice ${cls}" style="font-size:28px;margin:0;">${App.fmtNum(q.price)}</div>
-      <div class="${cls}" style="font-size:15px;">${App.fmtPct(q.change_pct)}　${q.change_amount >= 0 ? '+' : ''}${App.fmtNum(q.change_amount)}</div>
-    </div>
-    <div class="stat-grid" style="margin-bottom:14px;">${stats}</div>
-    <div class="panel-title"><h2>近60日走势</h2></div>
-    <div class="chart" id="detail-chart"></div>
-    <div style="margin-top:14px;"><a class="btn" href="/sim?code=${encodeURIComponent(q.code)}">在模拟盘交易 →</a></div>`;
-  if (series.length) Charts.line(document.getElementById('detail-chart'), series, { height: 220 });
-}
-
-async function openFundDetail(it) {
-  showModal('<div id="detail-body"><div class="empty">加载中…</div></div>');
-  try {
-    const nav = await App.api('/market/fund/' + it.code);
-    const cls = App.chgClass(nav.day_rate);
-    document.getElementById('detail-body').innerHTML = `
-      <h3>${App.escapeHtml(nav.name)} <span class="muted" style="font-size:13px;font-weight:400;">${App.escapeHtml(nav.code)}</span>
-        <span class="tag ${it.market_type}">${it.market_type === 'on' ? '场内' : '场外'}</span></h3>
-      <div style="display:flex;align-items:baseline;gap:12px;margin:6px 0 14px;">
-        <div class="qprice ${cls}" style="font-size:28px;margin:0;">${App.fmtNum(nav.net_worth)}</div>
-        <div class="${cls}" style="font-size:15px;">${App.fmtPct(nav.day_rate)}</div>
-      </div>
-      <div class="stat-grid">
-        <div class="stat"><div class="label">单位净值</div><div class="value" style="font-size:16px;">${App.fmtNum(nav.net_worth)}</div></div>
-        <div class="stat"><div class="label">日涨跌</div><div class="value ${cls}" style="font-size:16px;">${App.fmtPct(nav.day_rate)}</div></div>
-        <div class="stat"><div class="label">净值日期</div><div class="value" style="font-size:15px;">${App.escapeHtml(String(nav.nav_date || '').slice(0, 10))}</div></div>
-      </div>
-      <div style="margin-top:14px;"><a class="btn" href="/sim?code=${encodeURIComponent(nav.code)}&mt=${it.market_type}">在模拟盘交易 →</a></div>`;
-  } catch (e) {
-    document.getElementById('detail-body').innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>';
-  }
+function goDetail(idx) {
+  const it = _cardReg[idx];
+  if (it) location.href = detailUrl(it);
 }
 
 // ---------------- 搜索 ----------------
@@ -248,17 +184,10 @@ function onSearch() {
 function pickSearch(symbol) {
   hideSuggest();
   document.getElementById('search').value = '';
-  showModal('<div id="detail-body"><div class="empty">加载中…</div></div>');
-  (async () => {
-    try {
-      const q = await App.api('/market/quote?symbol=' + symbol);
-      let kl = [];
-      try { kl = await App.api('/market/kline?symbol=' + symbol + '&count=60'); } catch (e) {}
-      renderQuoteDetail({ code: q.code }, q, kl);
-    } catch (e) {
-      document.getElementById('detail-body').innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>';
-    }
-  })();
+  if (/^(sh000|sz399|sh880|sh930)/.test(symbol))
+    location.href = '/index?symbol=' + encodeURIComponent(symbol);
+  else
+    location.href = '/stock?symbol=' + encodeURIComponent(symbol);
 }
 function hideSuggest() { document.getElementById('suggest').classList.add('hidden'); }
 

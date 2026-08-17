@@ -139,11 +139,19 @@ async function submitAuth() {
 function boot() {
   document.getElementById('login').classList.add('hidden');
   document.getElementById('terminal').classList.remove('hidden');
-  // 从主页带过来的参数预填
+  // 从详情页带过来的参数预填：code / mt / side / name
   const p = new URLSearchParams(location.search);
   if (p.get('code')) {
-    if (p.get('mt') === 'on' || p.get('mt') === 'off') { setAsset('fund'); setSide('buy'); document.getElementById('marketType').value = p.get('mt'); }
+    if (p.get('mt') === 'on' || p.get('mt') === 'off') {
+      setAsset('fund');
+      document.getElementById('marketType').value = p.get('mt');
+    } else {
+      setAsset('stock');
+    }
+    const side = p.get('side');
+    if (side === 'buy' || side === 'sell') setSide(side);
     document.getElementById('code').value = p.get('code');
+    if (p.get('name')) document.getElementById('name').value = p.get('name');
   }
   loadAll();
   window.addEventListener('themechange', () => { loadEquity(curEqDays); loadAllocation(); });
