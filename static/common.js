@@ -27,6 +27,8 @@ const App = (() => {
       <nav class="nav">
         <a href="/home" data-nav="home">行情中心</a>
         <a href="/sim" data-nav="sim">模拟交易</a>
+        <a href="/positions" data-nav="positions">我的持仓</a>
+        <a href="/trades" data-nav="trades">交易记录</a>
         <a href="/admin" data-nav="admin">后台管理</a>
       </nav>
       <div class="top-actions">
