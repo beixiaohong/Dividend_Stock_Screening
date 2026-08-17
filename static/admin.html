@@ -7,109 +7,134 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="topbar">
-  <div class="logo" onclick="location.href='/home'">📈 模拟盘 · 后台管理</div>
-  <nav id="auth-slot"></nav>
-</div>
-
 <div class="container">
-  <div id="login" class="login-box panel hidden">
-    <h2>登录后台</h2>
+
+  <div class="auth-card panel hidden" id="login">
+    <div class="tabs">
+      <button id="tab-login" class="active" onclick="setAuth('login')">登录</button>
+      <button id="tab-reg" onclick="setAuth('reg')">注册</button>
+    </div>
     <div class="field"><label>账号</label><input id="acc" placeholder="账号"></div>
-    <div class="field"><label>密码</label><input id="pwd" type="password" placeholder="密码" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button style="width:100%;" onclick="doLogin()">登录</button>
+    <div class="field hidden" id="nick-field"><label>昵称</label><input id="nick" placeholder="注册用昵称"></div>
+    <div class="field"><label>密码</label><input id="pwd" type="password" placeholder="密码" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+    <button class="btn block" onclick="submitAuth()">登录</button>
   </div>
 
   <div id="admin" class="hidden">
+
     <div class="panel">
-      <h2>默认初始资金</h2>
+      <div class="panel-title"><h2>默认参数</h2></div>
       <div class="row" style="align-items:flex-end;">
-        <div class="field"><label>初始虚拟资金(元)</label><input id="capital" type="number" min="0"></div>
-        <button onclick="saveSetting()">保存参数</button>
-        <button class="ghost" onclick="seed()">补充默认热门标的</button>
+        <div class="field" style="width:220px;"><label>初始虚拟资金(元)</label>
+          <input id="capital" type="number" min="0"></div>
+        <button class="btn" onclick="saveSetting()">保存参数</button>
+        <button class="btn ghost" onclick="seed()">补充默认数据</button>
+        <button class="btn ghost" onclick="syncNav()">同步基金净值</button>
       </div>
-      <div class="muted">新用户开户时使用的初始资金；已在交易的账户不受影响。</div>
+      <div class="muted" style="margin-top:6px;">新用户开户使用的初始资金；已在交易的账户不受影响。</div>
     </div>
 
     <div class="panel">
-      <h2>热门标的维护（主页展示）</h2>
-      <div class="row">
-        <div class="field"><label>分类</label>
+      <div class="panel-title"><h2>热门标的维护（主页展示）</h2><span class="meta" id="form-meta">新增模式</span></div>
+      <div class="row" style="align-items:flex-end;">
+        <div class="field" style="width:130px;"><label>分类</label>
           <select id="h-category">
-            <option value="index">指数</option>
-            <option value="stock">股票</option>
-            <option value="etf">ETF</option>
-            <option value="fund">基金</option>
-          </select>
-        </div>
-        <div class="field"><label>代码(6位)</label><input id="h-code" placeholder="如 600519"></div>
-        <div class="field"><label>名称</label><input id="h-name" placeholder="名称"></div>
-        <div class="field"><label>行情代码(股票/指数/ETF带前缀)</label><input id="h-symbol" placeholder="如 sh600519"></div>
-        <div class="field"><label>基金市场</label>
-          <select id="h-mt"><option value="off">场外</option><option value="on">场内</option></select>
-        </div>
-        <div class="field"><label>排序</label><input id="h-sort" type="number" value="0"></div>
-        <div class="field"><label>展示</label><input id="h-active" type="checkbox" checked style="width:auto;"></div>
+            <option value="index">指数</option><option value="stock">股票</option>
+            <option value="etf">ETF</option><option value="fund">基金</option>
+          </select></div>
+        <div class="field" style="width:120px;"><label>代码(6位)</label><input id="h-code" placeholder="600519"></div>
+        <div class="field" style="width:160px;"><label>名称</label><input id="h-name" placeholder="名称"></div>
+        <div class="field" style="width:170px;"><label>行情代码(带前缀)</label><input id="h-symbol" placeholder="sh600519"></div>
+        <div class="field" style="width:110px;"><label>基金市场</label>
+          <select id="h-mt"><option value="off">场外</option><option value="on">场内</option></select></div>
+        <div class="field" style="width:90px;"><label>排序</label><input id="h-sort" type="number" value="0"></div>
+        <div class="field" style="width:auto;"><label>展示</label>
+          <label class="switch"><input type="checkbox" id="h-active" checked><span class="track"></span></label></div>
       </div>
-      <div class="row">
-        <button id="h-submit" onclick="submitHot()">新增</button>
-        <button class="ghost" id="h-cancel" style="display:none;" onclick="cancelEdit()">取消编辑</button>
+      <div class="row" style="margin-top:4px;">
+        <button id="h-submit" class="btn" onclick="submitHot()">新增</button>
+        <button id="h-cancel" class="btn ghost hidden" onclick="cancelEdit()">取消编辑</button>
       </div>
     </div>
 
     <div class="panel">
-      <h2>当前热门标的</h2>
-      <table id="hot-table"><thead><tr>
+      <div class="panel-title"><h2>当前热门标的</h2><span class="meta" id="hot-count"></span></div>
+      <div class="table-wrap"><table id="hot-table"><thead><tr>
         <th>分类</th><th>代码</th><th>名称</th><th>行情代码</th><th>市场</th><th>排序</th><th>展示</th><th>操作</th>
-      </tr></thead><tbody></tbody></table>
+      </tr></thead><tbody></tbody></table></div>
     </div>
+
   </div>
 </div>
 
 <script src="/static/common.js"></script>
 <script>
-let editingId = null;
+App.mount('admin');
+
 const CAT_LABEL = { index: '指数', stock: '股票', etf: 'ETF', fund: '基金' };
 
-async function doLogin() {
+// ---------------- 登录 ----------------
+let authMode = 'login';
+function setAuth(m) {
+  authMode = m;
+  document.getElementById('tab-login').classList.toggle('active', m === 'login');
+  document.getElementById('tab-reg').classList.toggle('active', m === 'reg');
+  document.getElementById('nick-field').classList.toggle('hidden', m !== 'reg');
+  document.querySelector('#login .btn').textContent = (m === 'login' ? '登录' : '注册');
+}
+async function submitAuth() {
+  const acc = document.getElementById('acc').value.trim();
+  const pwd = document.getElementById('pwd').value;
+  if (!acc || !pwd) { App.toast('请输入账号和密码'); return; }
   try {
-    await App.login(document.getElementById('acc').value.trim(), document.getElementById('pwd').value);
-    App.toast('登录成功'); boot();
+    if (authMode === 'reg') {
+      await App.register(acc, pwd, document.getElementById('nick').value.trim());
+      App.toast('注册成功，自动登录中');
+    }
+    await App.login(acc, pwd);
+    App.toast('登录成功');
+    boot();
   } catch (e) { App.toast(e.message); }
+}
+
+function boot() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('admin').classList.remove('hidden');
+  loadSetting(); loadHotLists();
 }
 
 async function loadSetting() {
-  try {
-    const s = await App.api('/admin/settings/initial_capital');
-    document.getElementById('capital').value = s.value;
-  } catch (e) { /* 可能尚未设置 */ }
+  try { const s = await App.api('/admin/settings/initial_capital'); document.getElementById('capital').value = s.value; }
+  catch (e) {}
 }
 async function saveSetting() {
   const v = document.getElementById('capital').value;
-  try {
-    await App.api('/admin/settings/initial_capital', { method: 'PUT', body: JSON.stringify({ value: v }) });
-    App.toast('参数已保存');
-  } catch (e) { App.toast(e.message); }
+  try { await App.api('/admin/settings/initial_capital', { method: 'PUT', body: JSON.stringify({ value: v }) }); App.toast('参数已保存'); }
+  catch (e) { App.toast(e.message); }
 }
 async function seed() {
-  try {
-    const r = await App.api('/admin/seed', { method: 'POST', body: '{}' });
-    App.toast('已补充默认数据：' + JSON.stringify(r.data || {}));
-    loadHotLists();
-  } catch (e) { App.toast(e.message); }
+  try { const r = await App.api('/admin/seed', { method: 'POST', body: '{}' }); App.toast('已补充：' + JSON.stringify(r.data || {})); loadHotLists(); }
+  catch (e) { App.toast(e.message); }
+}
+async function syncNav() {
+  try { const r = await App.api('/admin/fund-nav/sync', { method: 'POST', body: '{}' }); App.toast('净值同步完成'); }
+  catch (e) { App.toast(e.message); }
 }
 
+// ---------------- 热门标的 CRUD ----------------
+let editingId = null;
 async function loadHotLists() {
   try {
     const list = await App.api('/admin/hot-lists');
-    const body = document.querySelector('#hot-table tbody');
-    body.innerHTML = list.length ? list.map(h => `<tr>
-      <td>${CAT_LABEL[h.category]||h.category}</td><td>${h.code}</td><td>${h.name||''}</td>
-      <td>${h.symbol||''}</td><td>${h.category==='fund'?(h.market_type==='on'?'场内':'场外'):'-'}</td>
-      <td>${h.sort_order}</td><td>${h.is_active?'✓':'✗'}</td>
+    document.getElementById('hot-count').textContent = list.length + ' 条';
+    document.querySelector('#hot-table tbody').innerHTML = list.length ? list.map(h => `<tr>
+      <td>${CAT_LABEL[h.category] || h.category}</td><td>${App.escapeHtml(h.code)}</td><td>${App.escapeHtml(h.name || '')}</td>
+      <td>${App.escapeHtml(h.symbol || '')}</td>
+      <td>${h.category === 'fund' ? (h.market_type === 'on' ? '场内' : '场外') : '-'}</td>
+      <td>${h.sort_order}</td><td>${h.is_active ? '<span class="up">✓</span>' : '<span class="muted">✗</span>'}</td>
       <td>
-        <button class="btn-sm ghost" onclick="editHot(${h.id},'${h.category}','${h.code}','${(h.name||'').replace(/'/g,"")}','${(h.symbol||'').replace(/'/g,"")}','${h.market_type}',${h.sort_order},${h.is_active})">编辑</button>
-        <button class="btn-sm danger" onclick="deleteHot(${h.id})">删除</button>
+        <button class="btn sm ghost" onclick="editHot(${h.id},'${h.category}','${App.escapeHtml(h.code)}','${App.escapeHtml(h.name || '').replace(/'/g, '')}','${App.escapeHtml(h.symbol || '').replace(/'/g, '')}','${h.market_type}',${h.sort_order},${h.is_active})">编辑</button>
+        <button class="btn sm danger" onclick="deleteHot(${h.id})">删除</button>
       </td></tr>`).join('')
       : '<tr><td colspan="8" class="center muted">暂无数据</td></tr>';
   } catch (e) { App.toast(e.message); }
@@ -125,16 +150,18 @@ function editHot(id, cat, code, name, symbol, mt, sort, active) {
   document.getElementById('h-sort').value = sort;
   document.getElementById('h-active').checked = active;
   document.getElementById('h-submit').textContent = '保存修改';
-  document.getElementById('h-cancel').style.display = '';
+  document.getElementById('h-cancel').classList.remove('hidden');
+  document.getElementById('form-meta').textContent = '编辑 #' + id;
   App.toast('编辑中：' + code);
 }
 function cancelEdit() {
   editingId = null;
-  ['h-code','h-name','h-symbol'].forEach(id => document.getElementById(id).value = '');
+  ['h-code', 'h-name', 'h-symbol'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('h-sort').value = 0;
   document.getElementById('h-active').checked = true;
   document.getElementById('h-submit').textContent = '新增';
-  document.getElementById('h-cancel').style.display = 'none';
+  document.getElementById('h-cancel').classList.add('hidden');
+  document.getElementById('form-meta').textContent = '新增模式';
 }
 
 async function submitHot() {
@@ -163,19 +190,10 @@ async function submitHot() {
 
 async function deleteHot(id) {
   if (!confirm('确定删除该热门标的？')) return;
-  try {
-    await App.api('/admin/hot-lists/' + id, { method: 'DELETE' });
-    App.toast('已删除'); loadHotLists();
-  } catch (e) { App.toast(e.message); }
+  try { await App.api('/admin/hot-lists/' + id, { method: 'DELETE' }); App.toast('已删除'); loadHotLists(); }
+  catch (e) { App.toast(e.message); }
 }
 
-function boot() {
-  document.getElementById('login').classList.add('hidden');
-  document.getElementById('admin').classList.remove('hidden');
-  loadSetting(); loadHotLists();
-}
-
-App.renderAuth();
 if (App.isLogin()) boot();
 else document.getElementById('login').classList.remove('hidden');
 </script>
