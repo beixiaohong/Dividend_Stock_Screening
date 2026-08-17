@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基金详情 · 模拟盘</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="page-head">
+    <a class="back-link" href="/home">← 返回行情中心</a>
+  </div>
+
+  <div class="detail-head" id="detail-head">
+    <div class="chg-bar"></div>
+    <div class="dh-main">
+      <div class="dh-name"></div>
+      <div class="dh-code"></div>
+      <div class="price-hero"></div>
+      <div class="price-chg"></div>
+    </div>
+    <div class="dh-actions"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <h2>净值走势</h2>
+      <div class="seg" style="width:auto;">
+        <button data-k="30" onclick="FundDetail.loadNav(30,this)">30日</button>
+        <button data-k="60" onclick="FundDetail.loadNav(60,this)">60日</button>
+        <button data-k="120" class="active" onclick="FundDetail.loadNav(120,this)">120日</button>
+        <button data-k="250" onclick="FundDetail.loadNav(250,this)">250日</button>
+      </div>
+    </div>
+    <div class="kpi-grid" id="kpi-grid" style="margin-bottom:14px;"></div>
+    <div class="chart" id="nav-chart"></div>
+  </div>
+
+  <div id="detail-body"></div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
+<script>
+const FundDetail = (() => {
+  let code = '', name = '', mt = '';
+
+  function init() {
+    const p = new URLSearchParams(location.search);
+    code = (p.get('code') || '').trim();
+    mt = p.get('mt') || '';
+    App.mount('home');
+    if (!code) {
+      document.getElementById('detail-body').innerHTML = '<div class="empty">缺少 code 参数</div>';
+      return;
+    }
+    load();
+  }
+
+  async function load() {
+    try {
+      const d = await App.api('/market/fund/' + encodeURIComponent(code));
+      name = d.name || code;
+      renderHead(d);
+      if (mt === 'on') tryRealtime(d);
+    } catch (e) {
+      document.getElementById('detail-body').innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>';
+    }
+    loadNav(120);
+  }
+
+  function renderHead(d) {
+    const cls = App.chgClass(d.day_rate);
+    const head = document.getElementById('detail-head');
+    const bar = head.querySelector('.chg-bar');
+    if (bar) bar.style.background = cls === 'up' ? 'var(--up)' : cls === 'down' ? 'var(--down)' : 'var(--flat)';
+
+    const typeLabel = (d.fs_type === 1) ? '股票型'
+      : (d.fs_type === 2) ? '债券型'
+      : (d.fs_type === 3) ? '混合型' : '基金';
+    head.querySelector('.dh-name').innerHTML = App.escapeHtml(d.name || code)
+      + ' <span class="tag">' + typeLabel + '</span>';
+    head.querySelector('.dh-code').textContent = d.code;
+
+    const hero = head.querySelector('.price-hero');
+    hero.textContent = App.fmtNum(d.net_worth, 4);
+    hero.className = 'price-hero ' + cls;
+    head.querySelector('.price-chg').innerHTML = App.fmtPct(d.day_rate)
+      + '　<span class="muted">单位净值 · ' + (d.nav_date || '—') + '</span>';
+    head.querySelector('.price-chg').className = 'price-chg ' + cls;
+
+    head.querySelector('.dh-actions').innerHTML =
+      '<button class="btn" onclick="FundDetail.trade(\'buy\',\'off\')">申购(场外)</button>'
+      + '<button class="btn ghost" onclick="FundDetail.trade(\'buy\',\'on\')">买入(场内)</button>';
+
+    const stage = [
+      { k: '近1月', num: d.syl_1y }, { k: '近3月', num: d.syl_3y },
+      { k: '近6月', num: d.syl_6y }, { k: '近1年', num: d.syl_1n },
+    ];
+    const kpis = [
+      { k: '最新净值', v: App.fmtNum(d.net_worth, 4), num: d.net_worth },
+      { k: '日涨跌幅', v: App.fmtPct(d.day_rate), num: d.day_rate },
+      { k: '净值日期', v: d.nav_date || '--' },
+      { k: '基金类型', v: typeLabel },
+      { k: '最小申购', v: d.fund_minsg != null ? App.fmtNum(d.fund_minsg, 0) + '元' : '--' },
+    ].concat(stage.map(s => ({
+      k: s.k, num: s.num,
+      v: s.num != null ? App.fmtPct(s.num) : '--',
+    })));
+    document.getElementById('kpi-grid').innerHTML = kpis.map(o => {
+      const vc = (o.num != null && !isNaN(o.num)) ? ' ' + App.chgClass(o.num) : '';
+      return `<div class="kpi"><div class="k">${o.k}</div><div class="v${vc}">${o.v}</div></div>`;
+    }).join('');
+  }
+
+  async function tryRealtime(d) {
+    // 场内基金尝试取实时价，作为参考展示
+    if (mt !== 'on') return;
+    for (const pre of ['sh', 'sz']) {
+      try {
+        const q = await App.api('/market/quote?symbol=' + pre + code);
+        if (q && q.price != null) {
+          const cls = App.chgClass(q.change_amount);
+          const el = document.getElementById('kpi-grid');
+          const rt = document.createElement('div');
+          rt.className = 'kpi';
+          rt.innerHTML = `<div class="k">实时价</div><div class="v ${cls}">${App.fmtNum(q.price)} (${App.fmtPct(q.change_pct)})</div>`;
+          el.appendChild(rt);
+          return;
+        }
+      } catch (e) {}
+    }
+  }
+
+  async function loadNav(days) {
+    document.querySelectorAll('[data-k]').forEach(b =>
+      b.classList.toggle('active', Number(b.dataset.k) === Number(days)));
+    const el = document.getElementById('nav-chart');
+    try {
+      const hist = await App.api('/market/fund/' + encodeURIComponent(code) + '/history?days=' + days);
+      const series = (hist || []).filter(r => r.net_worth != null)
+        .map(r => ({ label: (r.date || '').slice(5), value: r.net_worth }));
+      if (!series.length) { el.innerHTML = '<div class="empty">暂无净值数据</div>'; return; }
+      Charts.line(el, series, { height: 300, valueFmt: v => App.fmtNum(v, 4) });
+    } catch (e) {
+      el.innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>';
+    }
+  }
+
+  function trade(side, market) {
+    location.href = '/sim?code=' + encodeURIComponent(code) + '&mt=' + market
+      + '&side=' + side + '&name=' + encodeURIComponent(name || '');
+  }
+
+  return { init, loadNav, trade };
+})();
+FundDetail.init();
+</script>
+</body>
+</html>
