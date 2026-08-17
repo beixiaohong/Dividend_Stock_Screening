@@ -35,7 +35,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 # 导入核心配置与模型
 from core.database import engine, Base, SessionLocal
-from api import user_router, stock_router, holdings_router
+from api import user_router, stock_router, holdings_router, fund_router
 
 # 导入业务服务
 from services.stock_service import stock_service
@@ -266,6 +266,7 @@ app = FastAPI(
 app.include_router(user_router.router)      # 用户注册、登录、个人中心
 app.include_router(stock_router.router)     # 关注股、手动抓取、行情查看
 app.include_router(holdings_router.router)  # 买入卖出、盈亏统计
+app.include_router(fund_router.router)      # 基金关注、持仓、净值查询
 
 # 健康检查端点
 @app.get("/")
