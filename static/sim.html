@@ -3,205 +3,178 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>模拟交易终端</title>
+<title>模拟交易 · 模拟盘</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="topbar">
-  <div class="logo" onclick="location.href='/home'">📈 模拟盘 · 交易终端</div>
-  <nav id="auth-slot"></nav>
-</div>
-
 <div class="container">
 
   <!-- 登录 -->
-  <div id="login" class="login-box panel hidden">
-    <h2 id="login-title">登录模拟盘</h2>
-    <div class="field"><label>账号</label><input id="acc" placeholder="账号"></div>
-    <div class="field"><label>密码</label><input id="pwd" type="password" placeholder="密码" onkeydown="if(event.key==='Enter')App.isReg?doRegister():doLogin()"></div>
-    <div class="field"><label id="nick-field" class="hidden">昵称</label><input id="nick" class="hidden" placeholder="昵称(注册用)"></div>
-    <button style="width:100%;" onclick="App.isReg?doRegister():doLogin()">登录</button>
-    <div class="center muted" style="margin-top:10px;">
-      <a href="javascript:void(0)" id="toggle-reg" onclick="toggleReg()">没有账号？注册</a>
+  <div class="auth-card panel hidden" id="login">
+    <div class="tabs">
+      <button id="tab-login" class="active" onclick="setAuth('login')">登录</button>
+      <button id="tab-reg" onclick="setAuth('reg')">注册</button>
     </div>
+    <div class="field"><label>账号</label><input id="acc" placeholder="账号"></div>
+    <div class="field hidden" id="nick-field"><label>昵称</label><input id="nick" placeholder="注册用昵称"></div>
+    <div class="field"><label>密码</label><input id="pwd" type="password" placeholder="密码" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+    <button class="btn block" onclick="submitAuth()">登录</button>
   </div>
 
   <!-- 终端 -->
   <div id="terminal" class="hidden">
+
+    <div class="stat-grid" id="account-stats"></div>
+
     <div class="panel">
-      <div class="row" style="align-items:center; justify-content:space-between;">
-        <h2 style="margin:0;">我的模拟账户</h2>
-        <button class="btn-sm ghost" onclick="loadSummary()">刷新</button>
+      <div class="panel-title">
+        <h2>资产净值走势</h2>
+        <div class="seg" style="width:auto;">
+          <button data-d="30" onclick="loadEquity(30,this)">30天</button>
+          <button data-d="90" class="active" onclick="loadEquity(90,this)">90天</button>
+          <button data-d="180" onclick="loadEquity(180,this)">180天</button>
+        </div>
       </div>
-      <div class="row" id="account-stats" style="margin-top:12px;"></div>
+      <div class="chart" id="equity-chart"></div>
     </div>
 
     <div class="panel">
-      <h2>模拟交易</h2>
-      <div class="row">
-        <div class="field"><label>资产类型</label>
-          <select id="assetType" onchange="onAssetChange()">
-            <option value="stock">个股</option>
-            <option value="fund">基金</option>
-          </select>
+      <div class="panel-title"><h2>持仓配置</h2></div>
+      <div id="alloc-chart"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><h2>快速交易</h2><span class="meta" id="trade-tip"></span></div>
+      <div class="row" style="align-items:flex-end;">
+        <div class="seg" style="width:180px;">
+          <button data-asset="stock" class="active" onclick="setAsset('stock',this)">个股</button>
+          <button data-asset="fund" onclick="setAsset('fund',this)">基金</button>
         </div>
-        <div class="field" id="marketTypeField" style="display:none;"><label>基金市场</label>
-          <select id="marketType" onchange="onAssetChange()">
+        <div class="seg" style="width:160px;">
+          <button data-side="buy" class="active" onclick="setSide('buy',this)">买入</button>
+          <button data-side="sell" onclick="setSide('sell',this)">卖出</button>
+        </div>
+        <div class="field" id="marketTypeField" style="display:none;width:140px;">
+          <label>基金市场</label>
+          <select id="marketType" onchange="onTradeChange()">
             <option value="on">场内(ETF/LOF)</option>
             <option value="off">场外(开放式)</option>
           </select>
         </div>
-        <div class="field"><label>方向</label>
-          <select id="side" onchange="onAssetChange()">
-            <option value="buy">买入</option>
-            <option value="sell">卖出</option>
-          </select>
-        </div>
-        <div class="field"><label>代码</label><input id="code" placeholder="6位代码" onblur="onCodeBlur()"></div>
-        <div class="field"><label>名称(可选)</label><input id="name" placeholder="名称"></div>
-        <div class="field" id="qtyField"><label id="qtyLabel">数量(股)</label><input id="qty" type="number" min="0" placeholder="数量"></div>
-        <div class="field hidden" id="amtField"><label>申购金额(元)</label><input id="amt" type="number" min="0" placeholder="金额"></div>
-        <div class="field"><label>指定价格(可选)</label><input id="price" type="number" min="0" placeholder="留空取实时价"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>代码</label>
+          <input id="code" placeholder="6位代码" oninput="onTradeChange()"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>名称(可选)</label>
+          <input id="name" placeholder="名称"></div>
       </div>
+      <div class="row" style="align-items:flex-end;margin-top:4px;">
+        <div class="field" id="qtyField" style="width:160px;"><label id="qtyLabel">数量(股)</label>
+          <input id="qty" type="number" min="0" placeholder="数量" oninput="onTradeChange()"></div>
+        <div class="field hidden" id="amtField" style="width:160px;"><label>申购金额(元)</label>
+          <input id="amt" type="number" min="0" placeholder="金额" oninput="onTradeChange()"></div>
+        <div class="field" style="width:160px;"><label>指定价格(可选)</label>
+          <input id="price" type="number" min="0" placeholder="留空取实时价" oninput="onTradeChange()"></div>
+      </div>
+      <div id="preview" class="muted" style="margin:8px 0;"></div>
       <div class="row">
-        <button onclick="submitTrade()">提交委托</button>
-        <button class="danger" onclick="resetAccount()">重置账户</button>
+        <button class="btn" onclick="submitTrade()">提交委托</button>
+        <button class="btn danger" onclick="resetAccount()">重置账户</button>
       </div>
-      <div class="muted" id="trade-tip" style="margin-top:8px;"></div>
-      <div class="muted" id="nav-info" style="margin-top:4px;"></div>
     </div>
 
     <div class="panel">
-      <h2>持仓 — 个股</h2>
-      <table id="stock-pos"><thead><tr>
+      <div class="panel-title"><h2>持仓 — 个股</h2></div>
+      <div class="table-wrap"><table id="stock-pos"><thead><tr>
         <th>代码</th><th>名称</th><th>股数</th><th>成本价</th><th>现价</th><th>市值</th><th>浮动盈亏</th><th>已实现</th>
-      </tr></thead><tbody></tbody></table>
+      </tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="panel">
-      <h2>持仓 — 基金</h2>
-      <table id="fund-pos"><thead><tr>
-        <th>代码</th><th>名称</th><th>类型</th><th>份额</th><th>成本价</th><th>现价/净值</th><th>市值</th><th>浮动盈亏</th><th>已实现</th>
-      </tr></thead><tbody></tbody></table>
+      <div class="panel-title"><h2>持仓 — 基金</h2></div>
+      <div class="table-wrap"><table id="fund-pos"><thead><tr>
+        <th>代码</th><th>名称</th><th>类型</th><th>份额</th><th>成本价</th><th>现值/净值</th><th>市值</th><th>浮动盈亏</th><th>已实现</th>
+      </tr></thead><tbody></tbody></table></div>
     </div>
 
     <div class="panel">
-      <h2>交易流水</h2>
-      <table id="trades"><thead><tr>
+      <div class="panel-title"><h2>交易流水</h2></div>
+      <div class="table-wrap"><table id="trades"><thead><tr>
         <th>时间</th><th>类型</th><th>方向</th><th>代码</th><th>名称</th><th>价格</th><th>数量/份额</th><th>金额</th><th>费用</th><th>余额</th>
-      </tr></thead><tbody></tbody></table>
+      </tr></thead><tbody></tbody></table></div>
     </div>
+
   </div>
 </div>
 
 <script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
 <script>
-App.isReg = false;
+App.mount('sim');
 
-function toggleReg() {
-  App.isReg = !App.isReg;
-  document.getElementById('login-title').textContent = App.isReg ? '注册模拟盘账号' : '登录模拟盘';
-  document.getElementById('nick-field').classList.toggle('hidden', !App.isReg);
-  document.getElementById('nick').classList.toggle('hidden', !App.isReg);
-  document.querySelector('#login button').textContent = App.isReg ? '注册' : '登录';
-  document.getElementById('toggle-reg').textContent = App.isReg ? '已有账号？去登录' : '没有账号？注册';
+let curAsset = 'stock', curSide = 'buy', curMt = 'on';
+
+// ---------------- 登录 ----------------
+let authMode = 'login';
+function setAuth(m) {
+  authMode = m;
+  document.getElementById('tab-login').classList.toggle('active', m === 'login');
+  document.getElementById('tab-reg').classList.toggle('active', m === 'reg');
+  document.getElementById('nick-field').classList.toggle('hidden', m !== 'reg');
+  document.querySelector('#login .btn').textContent = (m === 'login' ? '登录' : '注册');
 }
-
-async function doLogin() {
+async function submitAuth() {
+  const acc = document.getElementById('acc').value.trim();
+  const pwd = document.getElementById('pwd').value;
+  if (!acc || !pwd) { App.toast('请输入账号和密码'); return; }
   try {
-    await App.login(document.getElementById('acc').value.trim(), document.getElementById('pwd').value);
+    if (authMode === 'reg') {
+      await App.register(acc, pwd, document.getElementById('nick').value.trim());
+      App.toast('注册成功，自动登录中');
+    }
+    await App.login(acc, pwd);
     App.toast('登录成功');
     boot();
   } catch (e) { App.toast(e.message); }
 }
-async function doRegister() {
-  try {
-    await App.register(
-      document.getElementById('acc').value.trim(),
-      document.getElementById('pwd').value,
-      document.getElementById('nick').value.trim()
-    );
-    App.toast('注册成功，自动登录中');
-    await doLogin();
-  } catch (e) { App.toast(e.message); }
-}
 
-function onAssetChange() {
-  const asset = document.getElementById('assetType').value;
-  const mt = document.getElementById('marketType').value;
-  const side = document.getElementById('side').value;
-  const mtField = document.getElementById('marketTypeField');
-  const qtyField = document.getElementById('qtyField');
-  const amtField = document.getElementById('amtField');
-  const qtyLabel = document.getElementById('qtyLabel');
-  const tip = document.getElementById('trade-tip');
-
-  mtField.style.display = (asset === 'fund') ? '' : 'none';
-  // 数量/金额切换
-  if (asset === 'stock') {
-    qtyField.classList.remove('hidden'); amtField.classList.add('hidden');
-    qtyLabel.textContent = '数量(股)';
-    tip.textContent = '个股按实时价成交（留空自动取实时价），手续费万三、最低5元。';
-  } else if (mt === 'on') {
-    qtyField.classList.remove('hidden'); amtField.classList.add('hidden');
-    qtyLabel.textContent = '数量(份)';
-    tip.textContent = '场内基金按实时市价成交。';
-  } else { // 场外
-    if (side === 'buy') {
-      qtyField.classList.add('hidden'); amtField.classList.remove('hidden');
-      tip.textContent = '场外基金按最新净值申购：输入申购金额，自动换算份额。';
-    } else {
-      qtyField.classList.remove('hidden'); amtField.classList.add('hidden');
-      qtyLabel.textContent = '赎回份额';
-      tip.textContent = '场外基金赎回：输入赎回份额，按最新净值结算。';
-    }
-    refreshNav();
+function boot() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('terminal').classList.remove('hidden');
+  // 从主页带过来的参数预填
+  const p = new URLSearchParams(location.search);
+  if (p.get('code')) {
+    if (p.get('mt') === 'on' || p.get('mt') === 'off') { setAsset('fund'); setSide('buy'); document.getElementById('marketType').value = p.get('mt'); }
+    document.getElementById('code').value = p.get('code');
   }
+  loadAll();
+  window.addEventListener('themechange', () => { loadEquity(curEqDays); loadAllocation(); });
 }
 
-async function onCodeBlur() {
-  const asset = document.getElementById('assetType').value;
-  const mt = document.getElementById('marketType').value;
-  if (asset === 'fund' && mt === 'off') refreshNav();
+async function loadAll() {
+  await loadSummary();
+  await loadEquity(90);
 }
 
-// 场外基金：拉取/补抓最新净值并展示（供申购赎回定价）
-async function refreshNav() {
-  const el = document.getElementById('nav-info');
-  const asset = document.getElementById('assetType').value;
-  const mt = document.getElementById('marketType').value;
-  if (!(asset === 'fund' && mt === 'off')) { el.innerHTML = ''; return; }
-  const code = document.getElementById('code').value.trim();
-  if (!code) { el.innerHTML = ''; return; }
-  try {
-    const d = await App.api('/market/fund/' + code);
-    const dt = new Date(d.nav_date);
-    const dateStr = isNaN(dt) ? '' : dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
-    el.innerHTML = `当前净值：<b>${App.fmtNum(d.net_worth)}</b>　日涨跌：<span class="${App.chgClass(d.day_rate)}">${App.fmtPct(d.day_rate)}</span>　净值日期：${dateStr}`;
-  } catch (e) {
-    el.textContent = '暂无可用的基金净值（请确认代码，或在后台执行「同步净值」）';
-  }
-}
-
+// ---------------- 汇总 ----------------
 async function loadSummary() {
   try {
-    const data = await App.api('/sim/summary');
-    renderAccount(data.account, data.realtime_available);
-    renderPositions(data.stock_positions, data.fund_positions);
+    const d = await App.api('/sim/summary');
+    renderAccount(d.account);
+    renderPositions(d.stock_positions, d.fund_positions);
     await renderTrades();
+    loadAllocation();
   } catch (e) { App.toast(e.message); }
 }
 
-function renderAccount(a, rt) {
+function renderAccount(a) {
   const pnlCls = App.chgClass(a.total_pnl);
+  const mv = a.total_asset - a.cash_balance;
   document.getElementById('account-stats').innerHTML = `
     <div class="stat"><div class="label">总资产</div><div class="value">¥${App.fmtNum(a.total_asset)}</div></div>
     <div class="stat"><div class="label">可用资金</div><div class="value">¥${App.fmtNum(a.cash_balance)}</div></div>
+    <div class="stat"><div class="label">持仓市值</div><div class="value">¥${App.fmtNum(mv)}</div></div>
+    <div class="stat"><div class="label">总盈亏</div><div class="value ${pnlCls}">${App.fmtNum(a.total_pnl)}</div><div class="delta ${pnlCls}">${App.fmtPct(a.total_pnl_pct)}</div></div>
     <div class="stat"><div class="label">初始资金</div><div class="value">¥${App.fmtNum(a.initial_capital)}</div></div>
-    <div class="stat"><div class="label">总盈亏</div><div class="value ${pnlCls}">${App.fmtNum(a.total_pnl)} (${App.fmtPct(a.total_pnl_pct)})</div></div>
-    <div class="stat"><div class="label">持仓数</div><div class="value">${a.position_count}</div></div>
-    <div class="stat"><div class="label">行情</div><div class="value" style="font-size:14px;"><span class="pill ${rt?'':'bad'}">${rt?'实时':'离线'}</span></div></div>
-  `;
+    <div class="stat"><div class="label">持仓数</div><div class="value">${a.position_count}</div></div>`;
 }
 
 function pnlCell(pnl, pct) {
@@ -210,77 +183,170 @@ function pnlCell(pnl, pct) {
 }
 
 function renderPositions(stocks, funds) {
-  const sbody = document.querySelector('#stock-pos tbody');
-  sbody.innerHTML = stocks.length ? stocks.map(p => `<tr>
-    <td>${p.stock_code}</td><td>${p.stock_name||''}</td><td>${App.fmtNum(p.shares,0)}</td>
-    <td>${App.fmtNum(p.avg_cost)}</td><td>${App.fmtNum(p.current_price)}</td>
-    <td>${App.fmtNum(p.market_value)}</td>
-    <td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td>
-    <td>${App.fmtNum(p.realized_pnl)}</td></tr>`).join('')
+  const s = document.querySelector('#stock-pos tbody');
+  s.innerHTML = stocks.length ? stocks.map(p => `<tr>
+    <td>${p.stock_code}</td><td>${App.escapeHtml(p.stock_name || '')}</td><td>${App.fmtNum(p.shares, 0)}</td>
+    <td>${App.fmtNum(p.avg_cost)}</td><td>${App.fmtNum(p.current_price)}</td><td>${App.fmtNum(p.market_value)}</td>
+    <td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td><td>${App.fmtNum(p.realized_pnl)}</td></tr>`).join('')
     : '<tr><td colspan="8" class="center muted">暂无持仓</td></tr>';
-
-  const fbody = document.querySelector('#fund-pos tbody');
-  fbody.innerHTML = funds.length ? funds.map(p => `<tr>
-    <td>${p.fund_code}</td><td>${p.fund_name||''}</td>
-    <td><span class="tag ${p.market_type}">${p.market_type==='on'?'场内':'场外'}</span></td>
-    <td>${App.fmtNum(p.shares)}</td><td>${App.fmtNum(p.avg_cost)}</td>
-    <td>${App.fmtNum(p.current_price)}</td><td>${App.fmtNum(p.market_value)}</td>
-    <td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td>
-    <td>${App.fmtNum(p.realized_pnl)}</td></tr>`).join('')
+  const f = document.querySelector('#fund-pos tbody');
+  f.innerHTML = funds.length ? funds.map(p => `<tr>
+    <td>${p.fund_code}</td><td>${App.escapeHtml(p.fund_name || '')}</td>
+    <td><span class="tag ${p.market_type}">${p.market_type === 'on' ? '场内' : '场外'}</span></td>
+    <td>${App.fmtNum(p.shares)}</td><td>${App.fmtNum(p.avg_cost)}</td><td>${App.fmtNum(p.current_price)}</td>
+    <td>${App.fmtNum(p.market_value)}</td><td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td><td>${App.fmtNum(p.realized_pnl)}</td></tr>`).join('')
     : '<tr><td colspan="9" class="center muted">暂无持仓</td></tr>';
 }
 
 async function renderTrades() {
   try {
     const trades = await App.api('/sim/trades?limit=100');
-    const body = document.querySelector('#trades tbody');
-    body.innerHTML = trades.length ? trades.map(t => `<tr>
+    document.querySelector('#trades tbody').innerHTML = trades.length ? trades.map(t => `<tr>
       <td>${App.fmtTime(t.created_at)}</td>
-      <td>${t.asset_type==='stock'?'个股':'基金'}</td>
-      <td class="${t.side==='buy'?'up':'down'}">${t.side==='buy'?'买入':'卖出'}</td>
-      <td>${t.code}</td><td>${t.name||''}</td><td>${App.fmtNum(t.price)}</td>
-      <td>${App.fmtNum(t.shares)}</td><td>${App.fmtNum(t.amount)}</td>
-      <td>${App.fmtNum(t.fee)}</td><td>${App.fmtNum(t.cash_after)}</td></tr>`).join('')
+      <td>${t.asset_type === 'stock' ? '个股' : '基金'}</td>
+      <td class="${t.side === 'buy' ? 'up' : 'down'}">${t.side === 'buy' ? '买入' : '卖出'}</td>
+      <td>${t.code}</td><td>${App.escapeHtml(t.name || '')}</td><td>${App.fmtNum(t.price)}</td>
+      <td>${App.fmtNum(t.shares)}</td><td>${App.fmtNum(t.amount)}</td><td>${App.fmtNum(t.fee)}</td><td>${App.fmtNum(t.cash_after)}</td></tr>`).join('')
       : '<tr><td colspan="10" class="center muted">暂无交易</td></tr>';
   } catch (e) { App.toast(e.message); }
 }
 
+// ---------------- 资产曲线 ----------------
+let curEqDays = 90;
+async function loadEquity(days, btn) {
+  curEqDays = days;
+  document.querySelectorAll('.seg button').forEach(b => { if (b.dataset.d == days) b.classList.add('active'); else if (b.dataset.d) b.classList.remove('active'); });
+  try {
+    const series = await App.api('/sim/equity?days=' + days);
+    const pts = series.map(r => ({ label: r.date.slice(5), value: r.total_asset }));
+    Charts.line(document.getElementById('equity-chart'), pts, {
+      height: 230,
+      valueFmt: v => '¥' + App.fmtNum(v, 0),
+    });
+  } catch (e) { document.getElementById('equity-chart').innerHTML = '<div class="empty">' + App.escapeHtml(e.message) + '</div>'; }
+}
+
+// ---------------- 持仓配置 ----------------
+async function loadAllocation() {
+  try {
+    const d = await App.api('/sim/summary');
+    const stockMV = d.stock_positions.reduce((a, p) => a + (p.market_value || 0), 0);
+    const fundMV = d.fund_positions.reduce((a, p) => a + (p.market_value || 0), 0);
+    const cash = d.account.cash_balance || 0;
+    const cs = getComputedStyle(document.documentElement);
+    const segs = [
+      { label: '现金', value: cash, color: cs.getPropertyValue('--muted').trim() || '#9aa3b2' },
+      { label: '股票', value: stockMV, color: cs.getPropertyValue('--brand').trim() || '#2164e6' },
+      { label: '基金', value: fundMV, color: cs.getPropertyValue('--up').trim() || '#e54545' },
+    ];
+    Charts.donut(document.getElementById('alloc-chart'), segs, {
+      centerLabel: '总市值',
+      centerFmt: v => '¥' + App.fmtNum(v, 0),
+    });
+  } catch (e) {}
+}
+
+// ---------------- 交易表单 ----------------
+function setAsset(a, btn) {
+  curAsset = a;
+  document.querySelectorAll('[data-asset]').forEach(b => b.classList.toggle('active', b.dataset.asset === a));
+  document.getElementById('marketTypeField').style.display = (a === 'fund') ? '' : 'none';
+  onTradeChange();
+}
+function setSide(s, btn) {
+  curSide = s;
+  document.querySelectorAll('[data-side]').forEach(b => b.classList.toggle('active', b.dataset.side === s));
+  onTradeChange();
+}
+
+async function livePrice(asset, mt, code) {
+  if (asset === 'fund' && mt === 'off') {
+    const nav = await App.api('/market/fund/' + code);
+    return { price: nav.net_worth, feeRate: 0.0015 };
+  }
+  for (const p of ['sh', 'sz']) {
+    try {
+      const q = await App.api('/market/quote?symbol=' + p + code);
+      if (q && q.price != null) return { price: q.price, feeRate: (asset === 'stock' ? 0.0003 : 0.0015) };
+    } catch (e) {}
+  }
+  throw new Error('未获取到实时价');
+}
+
+let previewTimer = null;
+function onTradeChange() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(refreshPreview, 300);
+}
+
+async function refreshPreview() {
+  const el = document.getElementById('preview');
+  const code = document.getElementById('code').value.trim();
+  if (!code) { el.innerHTML = ''; return; }
+  const mt = document.getElementById('marketType').value;
+  const tip = document.getElementById('trade-tip');
+  tip.textContent = (curAsset === 'stock')
+    ? '个股按实时价成交（万三，最低5元）'
+    : (mt === 'on' ? '场内基金按实时市价成交（费率0.15%）' : '场外基金按最新净值申购/赎回（费率0.15%）');
+  try {
+    const { price, feeRate } = await livePrice(curAsset, mt, code);
+    const spec = document.getElementById('price').value;
+    const px = spec ? Number(spec) : price;
+    let line = `当前价 <b>¥${App.fmtNum(price)}</b>　`;
+    if (curAsset === 'stock' || mt === 'on') {
+      const qty = Number(document.getElementById('qty').value) || 0;
+      const amount = px * qty;
+      const fee = Math.max(amount * feeRate, curAsset === 'stock' ? 5 : 0);
+      line += `数量 ${App.fmtNum(qty, 0)}　预估金额 <b>¥${App.fmtNum(amount)}</b>　费用 ¥${App.fmtNum(fee)}`;
+    } else {
+      const amt = Number(document.getElementById('amt').value) || 0;
+      const qty = Number(document.getElementById('qty').value) || 0;
+      if (curSide === 'buy') {
+        const shares = amt / px;
+        line += `申购 ¥${App.fmtNum(amt)} → 约 <b>${App.fmtNum(shares)}</b> 份　费用 ¥${App.fmtNum(amt * feeRate)}`;
+      } else {
+        const amount = qty * px;
+        line += `赎回 ${App.fmtNum(qty)} 份 → <b>¥${App.fmtNum(amount)}</b>　费用 ¥${App.fmtNum(amount * feeRate)}`;
+      }
+    }
+    el.innerHTML = line;
+  } catch (e) { el.innerHTML = '<span class="down">获取实时价失败：' + App.escapeHtml(e.message) + '</span>'; }
+}
+
 async function submitTrade() {
-  const asset = document.getElementById('assetType').value;
   const code = document.getElementById('code').value.trim();
   const name = document.getElementById('name').value.trim();
-  const price = document.getElementById('price').value;
+  const priceVal = document.getElementById('price').value;
   if (!code) { App.toast('请输入代码'); return; }
-  const priceBody = price ? `,"price":${Number(price)}` : '';
   let path, body;
-  if (asset === 'stock') {
+  if (curAsset === 'stock') {
     const qty = Number(document.getElementById('qty').value);
     if (!qty || qty <= 0) { App.toast('请输入有效数量'); return; }
-    path = '/sim/stock/' + (document.getElementById('side').value);
-    body = `{"stock_code":"${code}","stock_name":"${name}","shares":${qty}${priceBody}}`;
+    path = '/sim/stock/' + curSide;
+    body = { stock_code: code, stock_name: name, shares: qty };
+    if (priceVal) body.price = Number(priceVal);
   } else {
     const mt = document.getElementById('marketType').value;
-    const side = document.getElementById('side').value;
-    path = '/sim/fund/' + side;
+    path = '/sim/fund/' + curSide;
     const qty = Number(document.getElementById('qty').value);
     const amt = Number(document.getElementById('amt').value);
+    body = { fund_code: code, fund_name: name, market_type: mt };
+    if (priceVal) body.price = Number(priceVal);
     if (mt === 'on') {
       if (!qty || qty <= 0) { App.toast('请输入有效份额'); return; }
-      body = `{"fund_code":"${code}","fund_name":"${name}","market_type":"on","shares":${qty}${priceBody}}`;
+      body.shares = qty;
+    } else if (curSide === 'buy') {
+      if (!amt || amt <= 0) { App.toast('请输入申购金额'); return; }
+      body.amount = amt;
     } else {
-      if (side === 'buy') {
-        if (!amt || amt <= 0) { App.toast('请输入申购金额'); return; }
-        body = `{"fund_code":"${code}","fund_name":"${name}","market_type":"off","amount":${amt}${priceBody}}`;
-      } else {
-        if (!qty || qty <= 0) { App.toast('请输入赎回份额'); return; }
-        body = `{"fund_code":"${code}","fund_name":"${name}","market_type":"off","shares":${qty}${priceBody}}`;
-      }
+      if (!qty || qty <= 0) { App.toast('请输入赎回份额'); return; }
+      body.shares = qty;
     }
   }
   try {
-    await App.api(path, { method: 'POST', body });
+    await App.api(path, { method: 'POST', body: JSON.stringify(body) });
     App.toast('委托成功');
-    loadSummary();
+    loadAll();
   } catch (e) { App.toast(e.message); }
 }
 
@@ -289,18 +355,10 @@ async function resetAccount() {
   try {
     await App.api('/sim/reset', { method: 'POST', body: '{}' });
     App.toast('账户已重置');
-    loadSummary();
+    loadAll();
   } catch (e) { App.toast(e.message); }
 }
 
-function boot() {
-  document.getElementById('login').classList.add('hidden');
-  document.getElementById('terminal').classList.remove('hidden');
-  onAssetChange();
-  loadSummary();
-}
-
-App.renderAuth();
 if (App.isLogin()) boot();
 else document.getElementById('login').classList.remove('hidden');
 </script>
