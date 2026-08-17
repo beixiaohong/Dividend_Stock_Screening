@@ -112,6 +112,112 @@ const Charts = (() => {
       </div>`;
   }
 
+  // ---------------- 蜡烛图（含成交量副图） ----------------
+  function candle(el, rows, opts = {}) {
+    el.innerHTML = '';
+    if (!rows || !rows.length) { el.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    const height = opts.height || 320;
+    const W = Math.max(el.clientWidth || 600, 280);
+    const H = height;
+    const padL = 8, padR = 60, padT = 14, padB = 18;
+    const showVol = opts.volume !== false && rows.some(r => Number(r.volume) > 0);
+    const volH = showVol ? Math.round(H * 0.22) : 0;
+    const gap = showVol ? 14 : 0;
+    const mainTop = padT;
+    const mainBot = padT + (H - padT - padB - gap - volH);
+    const mainH = mainBot - mainTop;
+    const plotW = W - padL - padR;
+    const n = rows.length;
+
+    const prices = [];
+    rows.forEach(r => { prices.push(Number(r.high), Number(r.low)); });
+    let min = Math.min(...prices), max = Math.max(...prices);
+    if (min === max) { min -= 1; max += 1; }
+    const span = (max - min) || 1;
+    min -= span * 0.05; max += span * 0.05;
+
+    const cw = Math.max(1.5, Math.min(18, plotW / n * 0.66));
+    const X = i => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const Y = v => mainTop + (1 - (v - min) / (max - min)) * mainH;
+
+    const up = cssVar('--up', '#e54545');
+    const down = cssVar('--down', '#1ba784');
+    const grid = cssVar('--border', '#e6e8eb');
+    const fmt = opts.valueFmt || (v => App.fmtNum(v));
+
+    // 价格网格 + 右侧刻度
+    let g = '';
+    const ticks = 4;
+    for (let t = 0; t <= ticks; t++) {
+      const v = min + (max - min) * t / ticks;
+      const y = Y(v);
+      g += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="${grid}" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"></line>`;
+      g += `<text x="${W - padR + 5}" y="${(y + 3).toFixed(1)}">${fmt(v)}</text>`;
+    }
+    // 日期刻度
+    const xi = [0, Math.floor(n / 3), Math.floor(2 * n / 3), n - 1].filter((v, i, a) => a.indexOf(v) === i);
+    const xLabels = xi.map(i =>
+      `<text x="${X(i).toFixed(1)}" y="${H - 3}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${rows[i].date.slice(5)}</text>`).join('');
+
+    // 蜡烛
+    const candles = rows.map((r, i) => {
+      const o = Number(r.open), c = Number(r.close), h = Number(r.high), l = Number(r.low);
+      const isUp = c >= o;
+      const col = isUp ? up : down;
+      const x = X(i);
+      const yo = Y(o), yc = Y(c), yh = Y(h), yl = Y(l);
+      const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+      return `<line x1="${x.toFixed(1)}" y1="${yh.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yl.toFixed(1)}" stroke="${col}" stroke-width="1"></line>`
+        + `<rect x="${(x - cw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${cw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}"></rect>`;
+    }).join('');
+
+    // 成交量
+    let volSvg = '';
+    if (showVol) {
+      const volTop = mainBot + gap, volBot = H - padB;
+      const maxV = Math.max(...rows.map(r => Number(r.volume) || 0)) || 1;
+      volSvg = rows.map((r, i) => {
+        const h = (Number(r.volume) || 0) / maxV * (volBot - volTop);
+        const col = (Number(r.close) >= Number(r.open)) ? up : down;
+        return `<rect x="${(X(i) - cw / 2).toFixed(1)}" y="${(volBot - h).toFixed(1)}" width="${cw.toFixed(1)}" height="${Math.max(0.5, h).toFixed(1)}" fill="${col}" opacity="0.45"></rect>`;
+      }).join('');
+      volSvg += `<line x1="${padL}" y1="${volTop}" x2="${W - padR}" y2="${volTop}" stroke="${grid}" stroke-width="1" opacity="0.5"></line>`;
+    }
+
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+      ${g}${candles}${volSvg}${xLabels}
+      <line id="hl" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"></line>
+      <rect id="ov" x="${padL}" y="${mainTop}" width="${plotW}" height="${H - mainTop - padB}" fill="transparent"></rect>
+    </svg>`;
+
+    const svg = el.querySelector('svg');
+    const ov = el.querySelector('#ov');
+    const hl = el.querySelector('#hl');
+    const tip = _tip();
+    ov.addEventListener('mousemove', e => {
+      const r = svg.getBoundingClientRect();
+      const relX = (e.clientX - r.left) / r.width * W;
+      let i = Math.round((relX - padL) / (plotW || 1) * (n - 1));
+      i = Math.max(0, Math.min(n - 1, i));
+      const x = X(i);
+      hl.setAttribute('x1', x); hl.setAttribute('x2', x);
+      hl.setAttribute('y1', mainTop); hl.setAttribute('y2', H - padB);
+      hl.style.display = '';
+      const rw = rows[i];
+      const ref = i > 0 ? Number(rows[i - 1].close) : Number(rw.open);
+      const chg = Number(rw.close) - ref;
+      const pct = ref ? chg / ref * 100 : 0;
+      const cls = chg >= 0 ? 'up' : 'down';
+      tip.innerHTML = `<b>${rw.date}</b><br>开 ${App.fmtNum(rw.open)}　高 ${App.fmtNum(rw.high)}<br>低 ${App.fmtNum(rw.low)}　收 ${App.fmtNum(rw.close)}`
+        + `<br><span class="${cls}">涨跌 ${App.fmtNum(chg)} (${App.fmtPct(pct)})</span>　量 ${App.fmtNum(rw.volume, 0)}`;
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top = (e.clientY - 10) + 'px';
+      tip.style.opacity = '1';
+    });
+    ov.addEventListener('mouseleave', () => { hl.style.display = 'none'; tip.style.opacity = '0'; });
+    _bindResize(el, () => candle(el, rows, opts));
+  }
+
   // ---------------- 响应式 ----------------
   const _rs = new WeakMap();
   function _bindResize(el, fn) {
@@ -121,5 +227,5 @@ const Charts = (() => {
     window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fn, 150); });
   }
 
-  return { line, donut };
+  return { line, donut, candle };
 })();
