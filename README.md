@@ -318,7 +318,12 @@ python diagnose_data.py
 | 页面 | 地址 | 说明 |
 |------|------|------|
 | 行情主页 | `http://localhost:8000/home` | 实时行情板（公开访问） |
+| 股票详情 | `http://localhost:8000/stock?symbol=sh600519` | 个股行情详情（蜡烛图+统计） |
+| 指数详情 | `http://localhost:8000/index?symbol=sh000001` | 指数行情详情 |
+| 基金详情 | `http://localhost:8000/fund?code=110011&mt=off` | 基金净值详情（净值走势+阶段涨幅） |
 | 模拟交易终端 | `http://localhost:8000/sim` | 登录后买卖、查看持仓/流水 |
+| 我的持仓 | `http://localhost:8000/positions` | 持仓概览（含市值占比/浮动盈亏） |
+| 交易记录 | `http://localhost:8000/trades` | 成交流水（筛选+汇总） |
 | 后台管理 | `http://localhost:8000/admin` | 维护热门标的与参数 |
 
 ### 核心 API
@@ -341,7 +346,8 @@ python diagnose_data.py
 | | `/admin/settings/{key}` | GET/PUT | 系统参数（如 initial_capital） |
 | | `/admin/seed` | POST | 补充默认热门标的与参数（并同步默认场外基金净值） |
 | | `/admin/fund-nav/sync` | POST | 同步所有场外基金（热门+关注）最新净值 |
-| 净值 | `/market/fund/{code}` | GET | 场外基金最新净值（缺失时自动补抓） |
+| 净值 | `/market/fund/{code}` | GET | 场外基金最新净值（含近1月/3月/6月/1年收益率、类型，缺失时自动补抓） |
+| | `/market/fund/{code}/history?days=120` | GET | 基金净值历史走势（旧→新，详情页 NAV 走势图用，上限 730 日） |
 
 ### 数据模型（新增）
 
@@ -517,6 +523,21 @@ async def your_function(param: str):
 ---
 
 ## 📝 更新日志
+
+### v3.2 - 券商式详情页 + 持仓/交易页
+
+**前端**
+- ✅ 股票详情 `/stock`、指数详情 `/index`：价格英雄 + 涨跌色条 + KPI 统计网格 + **蜡烛图（含成交量副图）** + 模拟交易深链
+- ✅ 基金详情 `/fund`：净值头 + **净值走势图（30/60/120/250 日）** + 近1月/3月/6月/1年阶段涨幅 + 申购(场外)/买入(场内)深链，场内基金附实时价
+- ✅ 我的持仓 `/positions`：账户概览 + 个股/基金持仓表（实时估值、市值占比、浮动盈亏率），行深链到详情页
+- ✅ 交易记录 `/trades`：成交流水表 + 个股/基金 · 买入/卖出筛选 + 笔数/买卖额/手续费汇总
+- ✅ 顶栏导航新增「我的持仓」「交易记录」；行情中心卡片/搜索点击直达详情页
+- ✅ `Charts.candle()` 蜡烛图组件（涨红跌绿、十字光标 OHLC 提示、响应式）
+
+**后端 / API**
+- ✅ 新增 `GET /market/fund/{code}/history` —— 基金净值历史走势（旧→新）
+- ✅ 丰富 `GET /market/fund/{code}` —— 返回近1月/3月/6月/1年收益率与基金类型
+- ✅ `main.py` 新增 `/stock` `/index` `/fund` `/positions` `/trades` 路由
 
 ### v3.1 - 模拟盘 UI 重做 + 净值曲线
 
