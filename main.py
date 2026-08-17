@@ -36,6 +36,10 @@ from apscheduler.triggers.cron import CronTrigger
 # 导入核心配置与模型
 from core.database import engine, Base, SessionLocal
 from api import user_router, stock_router, holdings_router, fund_router
+from api import simulation_router, market_router, admin_router
+import crud.simulation as crud_sim
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 # 导入业务服务
 from services.stock_service import stock_service
@@ -88,6 +92,9 @@ async def lifespan(app: FastAPI):
     
     # 配置核心业务任务
     setup_business_tasks(main_scheduler)
+
+    # 播种默认热门标的与系统参数（仅当为空时）
+    _seed_default_data()
     
     # 启动主调度器
     main_scheduler.start()
@@ -206,6 +213,18 @@ def setup_business_tasks(scheduler):
     )
     logger.info("✓ 系统监控任务配置完成")
 
+    # 任务 F: 每日 21:00 同步场外基金最新净值（供主页与模拟盘计价）
+    scheduler.add_job(
+        lambda: sync_fund_navs_wrapper(),
+        CronTrigger(hour=21, minute=0),
+        id="sync_fund_navs",
+        name="基金净值同步",
+        misfire_grace_time=7200,
+        coalesce=True,
+        max_instances=1
+    )
+    logger.info("✓ 基金净值同步任务配置完成")
+
 def update_holdings_wrapper():
     """持仓更新包装函数"""
     try:
@@ -215,6 +234,17 @@ def update_holdings_wrapper():
         logger.info("持仓更新执行成功")
     except Exception as e:
         logger.error(f"持仓更新执行失败: {e}")
+
+def sync_fund_navs_wrapper():
+    """基金净值同步包装函数（定时任务调用）"""
+    try:
+        from services.fund_nav import sync_all_fund_navs
+        db = SessionLocal()
+        res = sync_all_fund_navs(db)
+        db.close()
+        logger.info(f"基金净值同步完成: 更新 {res.get('updated', 0)} 个, 失败 {len(res.get('failed', []))} 个")
+    except Exception as e:
+        logger.error(f"基金净值同步失败: {e}")
 
 def system_monitor_task():
     """系统监控任务"""
@@ -230,6 +260,32 @@ def system_monitor_task():
             if job:
                 status = "✓" if job.next_run_time else "⚠"
                 logger.info(f"   {status} {job.name}: 下次执行 {job.next_run_time}")
+
+def _seed_default_data():
+    """启动时为模拟盘播种默认热门标的与初始资金参数（已存在则跳过）。"""
+    try:
+        db = SessionLocal()
+        result = crud_sim.seed_default_data(db, crud_sim.get_initial_capital(db))
+        db.close()
+        if result["hot_added"] or result["setting_added"]:
+            print(f"✅ 模拟盘默认数据播种完成: {result}")
+    except Exception as e:
+        print(f"⚠️ 模拟盘默认数据播种失败(可忽略，启动后可在后台 /admin/seed 补充): {e}")
+    # 启动时为默认场外基金补充最新净值（best-effort，网络失败不阻塞启动）
+    _sync_default_fund_navs()
+
+
+def _sync_default_fund_navs():
+    """启动时为默认场外基金补充最新净值（best-effort）。"""
+    try:
+        from services.fund_nav import fetch_and_store, DEFAULT_OFF_FUND_CODES
+        db = SessionLocal()
+        res = fetch_and_store(db, DEFAULT_OFF_FUND_CODES)
+        db.close()
+        print(f"✅ 默认场外基金净值补充: 成功 {res['updated']} 个, 失败 {res['failed']}")
+    except Exception as e:
+        print(f"⚠️ 默认场外基金净值补充失败(可忽略，后台 /admin/fund-nav/sync 可手动补充): {e}")
+
 
 def show_scheduler_status():
     """显示调度器状态"""
@@ -267,6 +323,9 @@ app.include_router(user_router.router)      # 用户注册、登录、个人中�
 app.include_router(stock_router.router)     # 关注股、手动抓取、行情查看
 app.include_router(holdings_router.router)  # 买入卖出、盈亏统计
 app.include_router(fund_router.router)      # 基金关注、持仓、净值查询
+app.include_router(simulation_router.router)  # 模拟盘：账户/买卖/持仓/流水/汇总
+app.include_router(market_router.router)      # 主页实时行情
+app.include_router(admin_router.router)       # 后台：热门标的/参数维护
 
 # 健康检查端点
 @app.get("/")
@@ -322,6 +381,31 @@ async def trigger_task(task_id: str):
             return {"status": "error", "message": f"任务 {task_id} 不存在"}
     except Exception as e:
         return {"status": "error", "message": f"触发任务失败: {str(e)}"}
+
+# ============================================================
+# 静态前端（模拟盘主页 / 交易终端 / 后台）
+# ============================================================
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/home", response_class=FileResponse, include_in_schema=False)
+def home_page():
+    """东财式实时行情主页"""
+    return FileResponse("static/index.html")
+
+
+@app.get("/sim", response_class=FileResponse, include_in_schema=False)
+def sim_page():
+    """模拟交易终端"""
+    return FileResponse("static/sim.html")
+
+
+@app.get("/admin", response_class=FileResponse, include_in_schema=False)
+def admin_page():
+    """后台管理（热门标的 / 参数）"""
+    return FileResponse("static/admin.html")
+
 
 # 启动入口
 if __name__ == "__main__":

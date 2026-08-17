@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模拟盘 · 行情中心</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="logo" onclick="location.href='/home'">📈 模拟盘 · 行情中心</div>
+  <nav id="auth-slot"></nav>
+</div>
+
+<div class="container">
+  <div class="panel">
+    <div class="row" style="align-items:center; justify-content:space-between;">
+      <h2 style="margin:0;">实时行情</h2>
+      <div>
+        <span id="status" class="pill">连接中…</span>
+        <span id="updated" class="muted" style="margin-left:8px;"></span>
+        <button class="btn-sm ghost" onclick="loadHome()" style="margin-left:8px;">刷新</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="boards"></div>
+</div>
+
+<script src="/static/common.js"></script>
+<script>
+const SECTION_LABEL = { index: '指数', stock: '热门股票', etf: 'ETF', fund: '基金' };
+
+function card(item) {
+  const cls = App.chgClass(item.change_pct);
+  const price = App.fmtNum(item.price);
+  const chg = item.change_pct === null || item.change_pct === undefined
+    ? '<span class="muted">--</span>'
+    : `<span class="${cls}">${App.fmtPct(item.change_pct)}</span>`;
+  const sub = (item.change_amount !== null && item.change_amount !== undefined)
+    ? `<div class="chg ${cls}">${item.change_amount >= 0 ? '+' : ''}${App.fmtNum(item.change_amount)}</div>`
+    : `<div class="chg muted">--</div>`;
+  const tag = item.category === 'fund'
+    ? `<span class="tag ${item.market_type}">${item.market_type === 'on' ? '场内' : '场外'}</span>`
+    : '';
+  return `<div class="card">
+    <div class="name">${item.name} <span class="muted">${item.code}</span> ${tag}</div>
+    <div class="price ${cls}">${price}</div>
+    ${sub}
+  </div>`;
+}
+
+async function loadHome() {
+  try {
+    const data = await App.api('/market/home');
+    document.getElementById('status').textContent = data.realtime_available ? '实时行情已连接' : '行情源暂不可用(显示最近数据)';
+    document.getElementById('status').className = 'pill' + (data.realtime_available ? '' : ' bad');
+    document.getElementById('updated').textContent = '更新于 ' + (data.updated_at || '');
+    const boards = document.getElementById('boards');
+    boards.innerHTML = '';
+    ['index', 'stock', 'etf', 'fund'].forEach(cat => {
+      const items = data[cat] || [];
+      if (!items.length) return;
+      const cards = items.map(card).join('');
+      boards.innerHTML += `<div class="panel">
+        <div class="section-title"><strong>${SECTION_LABEL[cat]}</strong><span class="line"></span></div>
+        <div class="grid">${cards}</div>
+      </div>`;
+    });
+  } catch (e) {
+    document.getElementById('status').textContent = '加载失败';
+    document.getElementById('status').className = 'pill bad';
+    App.toast(e.message);
+  }
+}
+
+App.renderAuth();
+loadHome();
+setInterval(() => { if (document.visibilityState === 'visible') loadHome(); }, 15000);
+</script>
+</body>
+</html>
