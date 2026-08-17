@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>指数详情 · 模拟盘</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="page-head">
+    <a class="back-link" href="/home">← 返回行情中心</a>
+  </div>
+
+  <div class="detail-head" id="detail-head">
+    <div class="chg-bar"></div>
+    <div class="dh-main">
+      <div class="dh-name"></div>
+      <div class="dh-code"></div>
+      <div class="price-hero"></div>
+      <div class="price-chg"></div>
+    </div>
+    <div class="dh-actions"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <h2>行情数据</h2>
+      <div class="seg" style="width:auto;">
+        <button data-k="30" onclick="QuoteDetail.loadKline(30,this)">30日</button>
+        <button data-k="60" class="active" onclick="QuoteDetail.loadKline(60,this)">60日</button>
+        <button data-k="120" onclick="QuoteDetail.loadKline(120,this)">120日</button>
+      </div>
+    </div>
+    <div class="kpi-grid" id="kpi-grid" style="margin-bottom:14px;"></div>
+    <div class="chart" id="kline-chart"></div>
+  </div>
+
+  <div id="detail-body"></div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
+<script src="/static/quote_detail.js"></script>
+<script>QuoteDetail.init({ type: 'index' });</script>
+</body>
+</html>
