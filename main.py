@@ -438,6 +438,37 @@ def admin_page():
     return FileResponse("static/admin.html")
 
 
+# ---------------- 详情页 / 持仓 / 交易记录 ----------------
+@app.get("/stock", response_class=FileResponse, include_in_schema=False)
+def stock_detail_page():
+    """股票详情页（?symbol=sh600519）"""
+    return FileResponse("static/stock.html")
+
+
+@app.get("/index", response_class=FileResponse, include_in_schema=False)
+def index_detail_page():
+    """指数详情页（?symbol=sh000001）"""
+    return FileResponse("static/index_detail.html")
+
+
+@app.get("/fund", response_class=FileResponse, include_in_schema=False)
+def fund_detail_page():
+    """基金详情页（?code=110011&mt=off）"""
+    return FileResponse("static/fund.html")
+
+
+@app.get("/positions", response_class=FileResponse, include_in_schema=False)
+def positions_page():
+    """我的持仓页"""
+    return FileResponse("static/positions.html")
+
+
+@app.get("/trades", response_class=FileResponse, include_in_schema=False)
+def trades_page():
+    """交易记录页"""
+    return FileResponse("static/trades.html")
+
+
 # 启动入口
 if __name__ == "__main__":
     print("🔧 启动参数:")
