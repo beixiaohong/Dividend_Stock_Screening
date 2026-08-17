@@ -10,6 +10,7 @@ from sqlalchemy import desc, func
 
 from models.simulation import (
     SimAccount, SimStockPosition, SimFundPosition, SimTrade, HotList, SystemSetting,
+    SimEquitySnapshot,
 )
 
 
@@ -60,6 +61,60 @@ def reset_account(db: Session, user_id: int, initial_capital: float) -> SimAccou
     db.commit()
     db.refresh(acc)
     return acc
+
+
+def list_all_accounts(db: Session) -> List[SimAccount]:
+    """列出全部模拟账户（每日净值快照任务用）。"""
+    return db.query(SimAccount).all()
+
+
+def snapshot_equity(
+    db: Session, user_id: int,
+    total_asset: float, total_pnl: float, total_pnl_pct: float,
+    cash_balance: float, market_value: float,
+    snap_date=None,
+) -> SimEquitySnapshot:
+    """写入/更新某日净值快照（同一天幂等）。"""
+    from datetime import date
+    snap_date = snap_date or date.today()
+    existing = db.query(SimEquitySnapshot).filter(
+        SimEquitySnapshot.user_id == user_id,
+        SimEquitySnapshot.snap_date == snap_date,
+    ).first()
+    if existing:
+        existing.total_asset = total_asset
+        existing.cash_balance = cash_balance
+        existing.market_value = market_value
+        existing.total_pnl = total_pnl
+        existing.total_pnl_pct = total_pnl_pct
+    else:
+        existing = SimEquitySnapshot(
+            user_id=user_id, snap_date=snap_date,
+            total_asset=total_asset, cash_balance=cash_balance,
+            market_value=market_value, total_pnl=total_pnl, total_pnl_pct=total_pnl_pct,
+        )
+        db.add(existing)
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def get_equity_series(db: Session, user_id: int, days: int = 90) -> List[Dict[str, Any]]:
+    """返回最近 days 天的净值序列（升序），用于资产走势曲线。"""
+    from datetime import date, timedelta
+    cutoff = date.today() - timedelta(days=max(days, 1))
+    rows = db.query(SimEquitySnapshot).filter(
+        SimEquitySnapshot.user_id == user_id,
+        SimEquitySnapshot.snap_date >= cutoff,
+    ).order_by(SimEquitySnapshot.snap_date).all()
+    return [{
+        "date": r.snap_date.isoformat(),
+        "total_asset": r.total_asset,
+        "cash_balance": r.cash_balance,
+        "market_value": r.market_value,
+        "total_pnl": r.total_pnl,
+        "total_pnl_pct": r.total_pnl_pct,
+    } for r in rows]
 
 
 def update_account(db: Session, acc: SimAccount) -> SimAccount:

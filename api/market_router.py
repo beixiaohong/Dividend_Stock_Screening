@@ -5,7 +5,7 @@
 - GET /market/home  主页热门标的实时行情（股票/指数/ETF/基金），东财式行情板
 - GET /market/quote 任意代码实时行情（带前缀 symbol，如 sh600519）
 """
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -86,3 +86,32 @@ def fund_nav(code: str, db: Session = Depends(get_db)):
         "day_rate": nav.day_rate,
         "nav_date": nav.update_time,
     }
+
+
+@router.get("/kline", summary="单标的K线（收盘价序列）")
+def kline(
+    symbol: str = Query(..., description="带前缀行情代码，如 sh600519"),
+    count: int = Query(60, ge=1, le=365, description="返回根数"),
+    db: Session = Depends(get_db),
+):
+    """查询单标的的历史 K 线（默认前复权），用于详情页迷你走势图。"""
+    client = get_client()
+    try:
+        kl = client.get_kline(symbol, count=count)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"行情源不可用: {e}")
+    return [
+        {"date": k.date, "open": k.open, "close": k.close,
+         "high": k.high, "low": k.low, "volume": k.volume}
+        for k in (kl or [])
+    ]
+
+
+@router.get("/search", response_model=List[dict], summary="行情名称/代码搜索")
+def search(
+    q: str = Query(..., min_length=1, description="代码或名称关键词，如 600519 / 茅台"),
+    db: Session = Depends(get_db),
+):
+    """按代码或名称搜索 A 股/基金标的（腾讯 smartbox，返回带前缀 symbol）。"""
+    client = get_client()
+    return client.search(q, limit=8)

@@ -140,3 +140,12 @@ def get_trades(
 def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """返回账户总资产、收益及全部持仓（含实时估值）。"""
     return svc.get_summary(db, current_user.user_id)
+
+
+@router.get("/equity", summary="账户净值走势（资产曲线）")
+def get_equity(
+    days: int = 90, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回最近 days 天的账户净值快照序列，用于资产走势曲线。"""
+    return crud_sim.get_equity_series(db, current_user.user_id, days=days)

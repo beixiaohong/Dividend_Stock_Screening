@@ -139,3 +139,22 @@ class SystemSetting(Base):
     value = Column(String(255), comment="参数值")
     description = Column(String(255), comment="说明")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+
+
+class SimEquitySnapshot(Base):
+    """模拟账户每日净值快照 sim_equity_snapshots（资产走势曲线用）"""
+    __tablename__ = "sim_equity_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), index=True, nullable=False, comment="用户ID")
+    snap_date = Column(Date, index=True, nullable=False, comment="快照日期")
+    total_asset = Column(Float, default=0.0, comment="总资产(元)")
+    cash_balance = Column(Float, default=0.0, comment="可用资金(元)")
+    market_value = Column(Float, default=0.0, comment="持仓市值(元)")
+    total_pnl = Column(Float, default=0.0, comment="总盈亏(元)")
+    total_pnl_pct = Column(Float, default=0.0, comment="总收益率(%)")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'snap_date', name='uix_equity_snap'),
+    )

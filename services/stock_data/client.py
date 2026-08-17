@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
+import urllib.request
+import urllib.parse
 from typing import Optional
 
 from .models import (
@@ -295,6 +298,55 @@ class StockDataClient:
         if last_err:
             raise AllProvidersFailed(f"K线获取失败（末源错误：{last_err}）")
         raise AllProvidersFailed("所有数据源均未返回K线")
+
+    # ------------------------------------------------------------------
+    # 行情搜索（腾讯 smartbox，直接返回带前缀的 symbol，便于 /market/quote）
+    # ------------------------------------------------------------------
+    def search(self, query: str, limit: int = 8) -> list[dict]:
+        """按代码或名称搜索标的，返回 [{symbol, code, name}, ...]。
+
+        symbol 已带市场前缀（如 sh600519 / sz000858 / sh000001），
+        可直接传入 /market/quote 或主页详情。腾讯不可用时返回空列表。
+        """
+        q = query.strip()
+        if not q:
+            return []
+        url = "https://smartbox.gtimg.cn/s3/?v=2&t=all&q=" + urllib.parse.quote(q)
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://stockapp.finance.qq.com/",
+            })
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                raw = resp.read().decode("utf-8", "replace")
+        except Exception:
+            return []
+        m = re.search(r"\((.*)\)\s*;?\s*$", raw, re.DOTALL)
+        if not m:
+            return []
+        try:
+            data = json.loads(m.group(1).strip())
+        except Exception:
+            return []
+        # 兼容个别版本外层多包了一层数组的情况
+        if (isinstance(data, list) and len(data) == 1
+                and isinstance(data[0], list) and data[0]
+                and isinstance(data[0][0], list)):
+            data = data[0]
+        out = []
+        for item in data:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            symbol = str(item[0])
+            name = str(item[1])
+            out.append({
+                "symbol": symbol,
+                "code": normalize_code(symbol),
+                "name": name,
+            })
+            if len(out) >= limit:
+                break
+        return out
 
     # ------------------------------------------------------------------
     # 运维 / 观测

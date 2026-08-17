@@ -225,6 +225,18 @@ def setup_business_tasks(scheduler):
     )
     logger.info("✓ 基金净值同步任务配置完成")
 
+    # 任务 G: 每个交易日 15:30 为全部模拟账户快照净值（资产走势曲线用）
+    scheduler.add_job(
+        lambda: equity_snapshot_wrapper(),
+        CronTrigger(day_of_week='mon-fri', hour=15, minute=30),
+        id="equity_snapshot",
+        name="模拟盘净值快照",
+        misfire_grace_time=7200,
+        coalesce=True,
+        max_instances=1
+    )
+    logger.info("✓ 模拟盘净值快照任务配置完成")
+
 def update_holdings_wrapper():
     """持仓更新包装函数"""
     try:
@@ -245,6 +257,25 @@ def sync_fund_navs_wrapper():
         logger.info(f"基金净值同步完成: 更新 {res.get('updated', 0)} 个, 失败 {len(res.get('failed', []))} 个")
     except Exception as e:
         logger.error(f"基金净值同步失败: {e}")
+
+
+def equity_snapshot_wrapper():
+    """为每个模拟账户快照当日净值（资产走势曲线用）。"""
+    try:
+        db = SessionLocal()
+        accounts = crud_sim.list_all_accounts(db)
+        for acc in accounts:
+            mv = max(acc.total_asset - acc.cash_balance, 0.0)
+            crud_sim.snapshot_equity(
+                db, acc.user_id,
+                total_asset=acc.total_asset, total_pnl=acc.total_pnl,
+                total_pnl_pct=acc.total_pnl_pct,
+                cash_balance=acc.cash_balance, market_value=mv,
+            )
+        db.close()
+        logger.info(f"模拟盘净值快照完成: {len(accounts)} 个账户")
+    except Exception as e:
+        logger.error(f"模拟盘净值快照失败: {e}")
 
 def system_monitor_task():
     """系统监控任务"""
