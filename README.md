@@ -140,9 +140,9 @@ git clone <repository-url>
 cd stock-analysis-system
 
 # 2. 创建虚拟环境(推荐)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1  # Windows
+source .venv/bin/activate     # Linux/Mac
 
 # 3. 安装依赖
 pip install -r requirements.txt
