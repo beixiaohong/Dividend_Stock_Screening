@@ -439,6 +439,16 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    """静态资源禁用启发式缓存：始终重新校验（配合 ETag/Last-Modified），
+    避免前端更新后浏览器仍使用旧版 JS/CSS。"""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
 @app.get("/home", response_class=FileResponse, include_in_schema=False)
 def home_page():
     """东财式实时行情主页"""
