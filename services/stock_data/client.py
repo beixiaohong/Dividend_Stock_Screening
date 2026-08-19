@@ -335,32 +335,57 @@ class StockDataClient:
                 raw = resp.read().decode("utf-8", "replace")
         except Exception:
             return []
-        m = re.search(r"\((.*)\)\s*;?\s*$", raw, re.DOTALL)
-        if not m:
-            return []
-        try:
-            data = json.loads(m.group(1).strip())
-        except Exception:
-            return []
-        # 兼容个别版本外层多包了一层数组的情况
-        if (isinstance(data, list) and len(data) == 1
-                and isinstance(data[0], list) and data[0]
-                and isinstance(data[0][0], list)):
-            data = data[0]
-        out = []
-        for item in data:
-            if not isinstance(item, list) or len(item) < 2:
-                continue
-            symbol = str(item[0])
-            name = str(item[1])
-            out.append({
-                "symbol": symbol,
-                "code": normalize_code(symbol),
-                "name": name,
-            })
-            if len(out) >= limit:
-                break
-        return out
+
+        out: list[dict] = []
+        # smartbox v2 返回形如 v_hint="sh~600519~贵州茅台~gzmt~GP-A^sz~000858~五粮液~wly~GP-A^..."
+        # 每段：市场~代码~名称~拼音~类型；多条用 ^ 分隔；基金市场前缀为 jj（无 sh/sz）
+        m2 = re.search(r'v_hint="(.*?)"', raw, re.DOTALL)
+        if m2:
+            for seg in m2.group(1).split("^"):
+                parts = seg.split("~")
+                if len(parts) < 3 or not parts[1].isdigit():
+                    continue
+                market = parts[0].lower()
+                code = parts[1]
+                if market in ("sh", "sz"):
+                    symbol = market + code
+                elif market == "jj":  # 场外基金：无 sh/sz 前缀
+                    symbol = ""
+                else:  # hk/美股等跳过
+                    continue
+                out.append({
+                    "symbol": symbol,
+                    "code": code,
+                    "name": parts[2],
+                })
+                if len(out) >= limit:
+                    break
+        else:
+            m = re.search(r"\((.*)\)\s*;?\s*$", raw, re.DOTALL)
+            if m:
+                try:
+                    data = json.loads(m.group(1).strip())
+                except Exception:
+                    data = None
+                # 兼容个别版本外层多包了一层数组的情况
+                if (isinstance(data, list) and len(data) == 1
+                        and isinstance(data[0], list) and data[0]
+                        and isinstance(data[0][0], list)):
+                    data = data[0]
+                if isinstance(data, list):
+                    for item in data:
+                        if not isinstance(item, list) or len(item) < 2:
+                            continue
+                        symbol = str(item[0])
+                        name = str(item[1])
+                        out.append({
+                            "symbol": symbol,
+                            "code": normalize_code(symbol),
+                            "name": name,
+                        })
+                        if len(out) >= limit:
+                            break
+        return out[:limit]
 
     # ------------------------------------------------------------------
     # 运维 / 观测

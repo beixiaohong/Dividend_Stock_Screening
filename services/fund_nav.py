@@ -219,7 +219,7 @@ def fetch_and_store(db, codes: List[str], provider: Optional[FundNavProvider] = 
 
 
 def sync_all_fund_navs(db) -> Dict[str, Any]:
-    """汇总所有需要净值的基金（场外热门标的 + 用户关注的场外基金）并同步。
+    """汇总所有需要净值的基金（场外热门标的 + 用户关注的场外基金 + 搜索记录）并同步。
 
     返回 fetch_and_store 的结果；无待同步基金时返回空结果。
     """
@@ -231,6 +231,10 @@ def sync_all_fund_navs(db) -> Dict[str, Any]:
             codes.add(r.code)
     for c in crud_fund.get_all_watched_fund_codes(db):
         codes.add(c)
+    # 搜索过的场外基金也要保证有净值（用户搜索后即可交易/看详情）
+    for r in crud_sim.list_searched_symbols(db, limit=500):
+        if r.category == "fund" and r.market_type == "off":
+            codes.add(r.code)
 
     if not codes:
         return {"updated": 0, "failed": [], "details": [], "message": "无待同步基金"}
