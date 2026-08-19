@@ -27,6 +27,7 @@ import asyncio  # ← 其余 import 在补丁之后
 import datetime
 import logging
 import uvicorn
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -55,12 +56,14 @@ except ImportError:
     SCHEDULER_MANAGER_AVAILABLE = False
     print("⚠️ 调度管理器不可用，仅使用主调度器")
 
-# 配置日志
+# 配置日志（确保日志目录存在，锚定项目根目录）
+LOG_DIR = Path(__file__).resolve().parent / "log"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('log/system.log', encoding='utf-8'),
+        logging.FileHandler(LOG_DIR / 'system.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )

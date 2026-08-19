@@ -1,10 +1,15 @@
 # scheduler_manager.py - 增强版
 import asyncio
 import logging
+from pathlib import Path
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy import text
+
+# 日志目录（锚定项目根目录，与启动时的工作目录无关）
+LOG_DIR = Path(__file__).resolve().parent.parent / "log"
 
 class EnhancedSchedulerManager:
     def __init__(self):
@@ -17,8 +22,9 @@ class EnhancedSchedulerManager:
         logger = logging.getLogger('scheduler_manager')
         logger.setLevel(logging.INFO)
         
-        # 文件处理器
-        file_handler = logging.FileHandler('log/scheduler_detailed.log', encoding='utf-8')
+        # 文件处理器（确保日志目录存在）
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(LOG_DIR / "scheduler_detailed.log", encoding='utf-8')
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
