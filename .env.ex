@@ -1,5 +1,11 @@
 # 数据库
-DATABASE_URL=sqlite:///./stock_advanced_system.db
+# SQLite（开发环境）
+# DATABASE_URL=sqlite:///./stock_advanced_system.db
+# MySQL（推荐）：库不存在会自动创建（utf8mb4），表在启动时自动建
+DATABASE_URL=mysql+pymysql://root:yourpassword@127.0.0.1:3306/stodb?charset=utf8mb4
+# 云库（TiDB 等）需要 SSL 时：DB_SSL=1 并配置 SSL_CA（默认 ./isrgrootx1.pem）
+DB_SSL=0
+# SSL_CA=./isrgrootx1.pem
 
 # 安全
 SECRET_KEY=yoursecretkey_change_me
