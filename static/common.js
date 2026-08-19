@@ -124,7 +124,14 @@ const App = (() => {
   }
   function fmtTime(ts) {
     if (!ts) return '';
-    const d = new Date(ts);
+    let d;
+    if (typeof ts === 'string' && !/[Zz]|[+-]\d{2}:?\d{2}$/.test(ts)) {
+      // 后端 DateTime 无时区标记(库内为 UTC)，按 UTC 解析再转本地(北京)时间显示
+      d = new Date(ts.replace(' ', 'T') + 'Z');
+    } else {
+      d = new Date(ts);
+    }
+    if (isNaN(d.getTime())) return ts;
     const p = n => (n < 10 ? '0' + n : n);
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }

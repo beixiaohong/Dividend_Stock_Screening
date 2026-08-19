@@ -255,6 +255,15 @@ async function loadAllocation() {
 }
 
 // ---------------- 交易表单 ----------------
+function isStockTradingTime() {
+  // 工作日 9:30-11:30 / 13:00-15:00（分钟制）；周末不可交易
+  const now = new Date();
+  const d = now.getDay();
+  if (d === 0 || d === 6) return false;
+  const t = now.getHours() * 60 + now.getMinutes();
+  return (t >= 570 && t <= 690) || (t >= 780 && t <= 900);
+}
+
 function setAsset(a, btn) {
   curAsset = a;
   document.querySelectorAll('[data-asset]').forEach(b => b.classList.toggle('active', b.dataset.asset === a));
@@ -293,9 +302,15 @@ async function refreshPreview() {
   if (!code) { el.innerHTML = ''; return; }
   const mt = document.getElementById('marketType').value;
   const tip = document.getElementById('trade-tip');
+  if (curAsset === 'stock' && !isStockTradingTime()) {
+    tip.textContent = '⚠️ 当前非交易时段：股票仅允许工作日 9:30-11:30 / 13:00-15:00 交易';
+    el.innerHTML = '<span class="down">非交易时段，股票下单将被拒绝。可切换基金交易。</span>';
+    return;
+  }
   tip.textContent = (curAsset === 'stock')
     ? '个股按实时价成交（万三，最低5元）'
-    : (mt === 'on' ? '场内基金按实时市价成交（费率0.15%）' : '场外基金按最新净值申购/赎回（费率0.15%）');
+    : (mt === 'on' ? '场内基金按实时市价成交（费率0.15%）'
+       : '场外基金按净值申赎（费率0.15%）· 工作日15:00后申购/赎回按下一工作日净值确认(T+1)');
   try {
     const { price, feeRate } = await livePrice(curAsset, mt, code);
     const spec = document.getElementById('price').value;
@@ -326,6 +341,10 @@ async function submitTrade() {
   const name = document.getElementById('name').value.trim();
   const priceVal = document.getElementById('price').value;
   if (!code) { App.toast('请输入代码'); return; }
+  if (curAsset === 'stock' && !isStockTradingTime()) {
+    App.toast('当前非交易时段：股票仅允许工作日 9:30-11:30 / 13:00-15:00 交易');
+    return;
+  }
   let path, body;
   if (curAsset === 'stock') {
     const qty = Number(document.getElementById('qty').value);

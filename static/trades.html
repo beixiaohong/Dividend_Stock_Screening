@@ -38,7 +38,7 @@
   <div class="panel" style="padding:0;">
     <div class="table-wrap"><table id="trades"><thead><tr>
       <th>时间</th><th>类型</th><th>方向</th><th>市场</th><th>代码</th><th>名称</th>
-      <th>成交价</th><th>数量/份额</th><th>成交额</th><th>费用</th><th>余额</th>
+      <th>成交价</th><th>数量/份额</th><th>成交额</th><th>费用</th><th>余额</th><th>确认日</th>
     </tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -61,7 +61,7 @@ async function load() {
     allTrades = await App.api('/sim/trades?limit=1000');
     render();
   } catch (e) {
-    if (e.message.indexOf('登录') >= 0) { location.href = '/sim'; return; }
+    if (e.message.indexOf('登录') >= 0) { App.toast('请先登录后再查看交易记录'); setTimeout(() => { location.href = '/sim'; }, 600); return; }
     App.toast(e.message);
   }
 }
@@ -102,8 +102,9 @@ function render() {
       <td>${App.fmtNum(t.shares)}</td>
       <td>¥${App.fmtNum(t.amount)}</td>
       <td>${App.fmtNum(t.fee)}</td>
-      <td>${App.fmtNum(t.cash_after)}</td></tr>`;
-  }).join('') : '<tr><td colspan="11" class="center muted">暂无交易记录</td></tr>';
+      <td>${App.fmtNum(t.cash_after)}</td>
+      <td>${t.settle_date || '—'}</td></tr>`;
+  }).join('') : '<tr><td colspan="12" class="center muted">暂无交易记录</td></tr>';
 }
 
 load();

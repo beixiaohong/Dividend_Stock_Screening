@@ -58,7 +58,7 @@ async function load() {
     renderStocks(d.stock_positions || [], d.account.total_asset);
     renderFunds(d.fund_positions || [], d.account.total_asset);
   } catch (e) {
-    if (e.message.indexOf('登录') >= 0) { location.href = '/sim'; return; }
+    if (e.message.indexOf('登录') >= 0) { App.toast('请先登录后再查看持仓'); setTimeout(() => { location.href = '/sim'; }, 600); return; }
     App.toast(e.message);
   }
 }

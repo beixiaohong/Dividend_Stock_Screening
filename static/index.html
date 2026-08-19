@@ -71,7 +71,7 @@ async function loadHome() {
     st.textContent = rt ? '实时行情已连接' : '行情源暂不可用';
     st.className = 'pill' + (rt ? '' : ' bad');
     document.getElementById('updated').textContent = '更新于 ' + (HOME.updated_at || '');
-    renderBreadth();
+    loadBreadth();
     renderBoards();
   } catch (e) {
     document.getElementById('status').textContent = '加载失败';
@@ -83,6 +83,33 @@ async function loadHome() {
 function allItems() {
   if (!HOME) return [];
   return [].concat(HOME.indices || [], HOME.stocks || [], HOME.etfs || [], HOME.funds || []);
+}
+
+// ---------------- 市场概览（全市场涨跌统计） ----------------
+async function loadBreadth() {
+  try {
+    const o = await App.api('/market/overview');
+    const up = o.up || 0, down = o.down || 0, flat = o.flat || 0;
+    const total = o.total || (up + down + flat);
+    const pct = v => total ? (v / total * 100).toFixed(1) : '0.0';
+    document.getElementById('breadth').innerHTML = `
+      <div class="b"><div class="muted">上涨</div><div class="n up">${up}</div></div>
+      <div class="b"><div class="muted">下跌</div><div class="n down">${down}</div></div>
+      <div class="b"><div class="muted">平盘</div><div class="n flat">${flat}</div></div>
+      <div class="b" style="grid-column:span 1;">
+        <div class="muted">涨跌分布</div>
+        <div class="bar-track">
+          <div class="up-seg" style="width:${pct(up)}%"></div>
+          <div class="flat-seg" style="width:${pct(flat)}%"></div>
+          <div class="down-seg" style="width:${pct(down)}%"></div>
+        </div>
+      </div>`;
+    document.getElementById('breadth-meta').textContent =
+      `全市场 A 股 · 共 ${total} 只 · ${o.source === 'daily' ? '收盘数据' : '实时统计'}`;
+  } catch (e) {
+    // 兜底：基于推荐标的统计
+    renderBreadth();
+  }
 }
 
 function renderBreadth() {
@@ -107,7 +134,7 @@ function renderBreadth() {
         <div class="down-seg" style="width:${pct(down)}%"></div>
       </div>
     </div>`;
-  document.getElementById('breadth-meta').textContent = '共 ' + items.length + ' 个标的';
+  document.getElementById('breadth-meta').textContent = '共 ' + items.length + ' 个标的（推荐池）';
 }
 
 function renderBoards() {
