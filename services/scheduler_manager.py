@@ -109,11 +109,14 @@ class EnhancedSchedulerManager:
                 else:
                     raise Exception("数据库查询结果异常")
             
-            # 检查关键服务
+            # 检查关键服务（session 为同步 requests.Session，
+            # 必须放到线程执行，避免阻塞事件循环导致请求卡死）
             from services.stock_service import stock_service
             if hasattr(stock_service, 'session'):
                 try:
-                    response = await stock_service.session.get('https://httpbin.org/get', timeout=5)
+                    response = await asyncio.to_thread(
+                        stock_service.session.get, 'https://httpbin.org/get', timeout=5
+                    )
                     if response.status_code == 200:
                         self.logger.info("✅ 网络服务正常")
                     else:

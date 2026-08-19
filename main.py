@@ -143,13 +143,29 @@ async def lifespan(app: FastAPI):
     print("✅ 系统已安全停止\n")
     logger.info("系统关闭完成")
 
+# ---------- 定时任务异步包装 ----------
+# 注意：APScheduler 默认在线程池中执行任务，线程里没有运行中的事件循环，
+# 不能再使用 asyncio.create_task(...)。改为直接传 async 函数，
+# AsyncIOScheduler 会用 run_coroutine_threadsafe 把它调度到主循环上执行。
+async def _job_fetch_market_data():
+    await stock_service.fetch_daily_market_data()
+
+async def _job_analyze_stocks():
+    await stock_service.analyze_all_watched_stocks()
+
+async def _job_send_daily_emails():
+    await email_service.send_all_daily_reports()
+
+async def _job_sync_indices():
+    await index_service.sync_index_constituents()
+
 def setup_business_tasks(scheduler):
     """配置核心业务任务"""
     logger.info("配置核心业务任务...")
     
     # 任务 A: 每日 15:30 抓取全市场收盘数据
     scheduler.add_job(
-        lambda: asyncio.create_task(stock_service.fetch_daily_market_data()),
+        _job_fetch_market_data,
         CronTrigger(hour=15, minute=30),
         id="sync_market_data",
         name="市场数据抓取",
@@ -161,7 +177,7 @@ def setup_business_tasks(scheduler):
     
     # 任务 B: 每日 16:00 进行全量股票分析评分
     scheduler.add_job(
-        lambda: asyncio.create_task(stock_service.analyze_all_watched_stocks()),
+        _job_analyze_stocks,
         CronTrigger(hour=16, minute=0),
         id="analyze_stocks",
         name="股票分析",
@@ -185,7 +201,7 @@ def setup_business_tasks(scheduler):
     
     # 任务 D: 每日 18:00 生成报告并发送邮件
     scheduler.add_job(
-        lambda: asyncio.create_task(email_service.send_all_daily_reports()),
+        _job_send_daily_emails,
         CronTrigger(hour=18, minute=0),
         id="send_daily_emails",
         name="邮件报告",
@@ -197,7 +213,7 @@ def setup_business_tasks(scheduler):
     
     # 任务 E: 每周一凌晨 02:00 同步指数成分股
     scheduler.add_job(
-        lambda: asyncio.create_task(index_service.sync_index_constituents()),
+        _job_sync_indices,
         CronTrigger(day_of_week='mon', hour=2, minute=0),
         id="sync_indices",
         name="指数同步",
