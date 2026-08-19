@@ -178,8 +178,18 @@ class StockDataClient:
     # 对外接口
     # ------------------------------------------------------------------
     def get_realtime(self, codes: list[str]) -> dict[str, StockQuote]:
-        """批量获取实时行情，返回 {code: StockQuote}。"""
-        wanted = [normalize_code(c) for c in codes if normalize_code(c)]
+        """批量获取实时行情，返回 {code: StockQuote}。
+
+        key 统一为 normalize 后的 6 位数字；下发 provider 时保留原始代码
+        （可含 sh/sz 前缀），避免上证指数等 000xxx 代码被数字前缀规则误判为深市。
+        """
+        wanted: list[str] = []
+        seen: set[str] = set()
+        for c in codes:
+            n = normalize_code(c)
+            if n and n not in seen:
+                seen.add(n)
+                wanted.append(c)  # 保留原始形态（带前缀优先）
         result: dict[str, StockQuote] = {}
         remaining = list(wanted)
         last_err: Exception | None = None
@@ -197,19 +207,23 @@ class StockDataClient:
                 last_err = e
                 continue
             for q in quotes:
-                if q.code in remaining and q.code not in result and q.price is not None:
-                    result[q.code] = q
-                    remaining.remove(q.code)
+                nq = normalize_code(q.code)
+                for orig in remaining:
+                    if normalize_code(orig) == nq and q.price is not None:
+                        result[nq] = q
+                        remaining.remove(orig)
+                        break
 
         # 兜底：用缓存填补仍然缺失的代码
         for c in list(remaining):
-            cached = self._cache_get(f"realtime:{c}")
+            n = normalize_code(c)
+            cached = self._cache_get(f"realtime:{n}")
             if isinstance(cached, StockQuote):
-                result[c] = cached
+                result[n] = cached
                 remaining.remove(c)
 
         for q in result.values():
-            self._cache_set(f"realtime:{q.code}", q)
+            self._cache_set(f"realtime:{normalize_code(q.code)}", q)
 
         if not result and last_err:
             raise AllProvidersFailed(f"实时行情获取失败（末源错误：{last_err}）")

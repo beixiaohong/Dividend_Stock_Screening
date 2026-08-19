@@ -154,8 +154,12 @@ class TencentProvider(BaseProvider):
     _F_PB = 46
 
     def _code_with_market(self, code: str) -> str:
-        code = normalize_code(code)
-        return f"{market_of(code).value}{code}"
+        """带前缀代码转行情查询代码。已带 sh/sz 前缀时原样保留（避免指数被误判为深市股票）。"""
+        s = (code or "").strip().lower()
+        if s.startswith(("sh", "sz")):
+            return s
+        c = normalize_code(s)
+        return f"{market_of(c).value}{c}"
 
     def get_realtime(self, codes: list[str]) -> list[StockQuote]:
         if not codes:
@@ -301,9 +305,19 @@ class EastMoneyProvider(BaseProvider):
         self._fs = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
 
     def _secid(self, code: str) -> str:
-        code = normalize_code(code)
-        market = "1" if market_of(code) == Market.SH else "0"
-        return f"{market}.{code}"
+        """转东财 secid（沪市 1.xxxx / 深市 0.xxxx）。
+
+        已带 sh/sz 前缀时直接按前缀决定市场，避免指数（如 sh000001 上证指数）
+        被数字前缀规则误判为深市（sz000001 平安银行）。
+        """
+        s = (code or "").strip().lower()
+        if s.startswith("sh"):
+            market = "1"
+        elif s.startswith("sz"):
+            market = "0"
+        else:
+            market = "1" if market_of(s) == Market.SH else "0"
+        return f"{market}.{normalize_code(s)}"
 
     def get_stock_universe(self) -> list[str]:
         """获取全市场 A 股代码全集（带市场前缀，如 "sh600036"）。
@@ -502,8 +516,12 @@ class SinaProvider(BaseProvider):
     _F_TIME = 32
 
     def _code_with_market(self, code: str) -> str:
-        code = normalize_code(code)
-        return f"{market_of(code).value}{code}"
+        """带前缀代码转新浪查询代码。已带 sh/sz 前缀时原样保留。"""
+        s = (code or "").strip().lower()
+        if s.startswith(("sh", "sz")):
+            return s
+        c = normalize_code(s)
+        return f"{market_of(c).value}{c}"
 
     def get_realtime(self, codes: list[str]) -> list[StockQuote]:
         if not codes:
