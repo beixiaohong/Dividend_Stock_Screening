@@ -450,6 +450,55 @@ class StockDataService:
         return final_df
 
 
+    def fetch_qq_rank_full(self) -> pd.DataFrame:
+        """腾讯行情排行接口分页拉取全市场 A 股（东财/akshare 不可达时的降级源）。
+
+        返回列与 fetch_em_data_via_web_api 对齐（code/name/latest_price/change_pct/volume/amount）。
+        """
+        print("\n📡 通过腾讯行情排行接口获取全量行情数据...")
+        rows: list[dict] = []
+        offset = 0
+        count = 200
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://gu.qq.com/",
+        }
+        while offset < 8000:
+            url = (
+                "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList"
+                f"?board_code=aStock&sort_type=price&direct=down&offset={offset}&count={count}&_appver=11.16.0"
+            )
+            try:
+                r = self.session.get(url, timeout=10, headers=headers, verify=False)
+                body = r.json()
+            except Exception:
+                print(f"   ⚠️ 排行接口第 {offset // count + 1} 页失败，终止")
+                break
+            data = body.get("data") or {}
+            lst = data.get("rank_list") or []
+            if not lst:
+                break
+            for it in lst:
+                code = str(it.get("code", ""))
+                if len(code) == 8:  # 去掉 sh/sz 前缀
+                    code = code[2:]
+                rows.append({
+                    "code": code,
+                    "name": str(it.get("name", "")),
+                    "latest_price": self._safe_float_default(it.get("zxj")),
+                    "change_pct": self._safe_float_default(it.get("zdf")),
+                    "volume": self._safe_float_default(it.get("volume")),
+                    "amount": self._safe_float_default(it.get("turnover")),
+                })
+            got = data.get("total") or 0
+            if offset + len(lst) >= got:
+                break
+            offset += len(lst)
+        print(f"   ✅ 腾讯排行获取成功，共 {len(rows)} 条记录")
+        return pd.DataFrame(rows)
+
+
     async def fetch_em_data_via_akshare(self) -> pd.DataFrame:
         """
         通过 akshare 获取全量A股行情（备用方案）
@@ -510,6 +559,9 @@ class StockDataService:
         if df.empty:
             print("   ⚠️ akshare 失败，降级到直接请求东财接口...")
             df = await self.fetch_em_data_via_web_api()
+        if df.empty:
+            print("   ⚠️ 东财接口失败，降级到腾讯行情排行全量...")
+            df = await asyncio.to_thread(self.fetch_qq_rank_full)
         if df.empty:
             db.close()
             return {"status": "error", "message": "抓取数据为空"}
