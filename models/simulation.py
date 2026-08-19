@@ -158,3 +158,22 @@ class SimEquitySnapshot(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'snap_date', name='uix_equity_snap'),
     )
+
+
+class SearchedSymbol(Base):
+    """搜索记录表 searched_symbols（任意用户搜索过的标的，自动入库供数据覆盖）"""
+    __tablename__ = "searched_symbols"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(20), index=True, nullable=False, comment="stock=股票 index=指数 etf=ETF fund=基金")
+    code = Column(String(20), index=True, nullable=False, comment="6位代码")
+    name = Column(String(100), comment="名称")
+    symbol = Column(String(20), comment="带前缀行情代码(如 sh600519)")
+    market_type = Column(String(10), default='', comment="基金: on=场内 off=场外; 其余为空")
+    search_count = Column(Integer, default=1, comment="累计被搜索次数")
+    first_searched_at = Column(DateTime, default=datetime.utcnow, comment="首次被搜索时间")
+    last_searched_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="最近搜索时间")
+
+    __table_args__ = (
+        UniqueConstraint('category', 'code', name='uix_searched'),
+    )

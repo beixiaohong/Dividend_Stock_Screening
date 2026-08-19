@@ -10,7 +10,7 @@ from sqlalchemy import desc, func
 
 from models.simulation import (
     SimAccount, SimStockPosition, SimFundPosition, SimTrade, HotList, SystemSetting,
-    SimEquitySnapshot,
+    SimEquitySnapshot, SearchedSymbol,
 )
 
 
@@ -369,3 +369,34 @@ def seed_default_data(db: Session, initial_capital: float = 1000000.0) -> Dict[s
         setting_count = 1
 
     return {"hot_added": hot_count, "setting_added": setting_count}
+
+
+# ============================================================
+# 搜索记录（searched_symbols）
+# ============================================================
+def upsert_searched_symbol(db: Session, data: Dict[str, Any]) -> SearchedSymbol:
+    """记录一次搜索命中：同 category+code 存在则累加次数，否则新增。"""
+    obj = db.query(SearchedSymbol).filter(
+        SearchedSymbol.category == data["category"],
+        SearchedSymbol.code == data["code"],
+    ).first()
+    if obj:
+        obj.search_count = (obj.search_count or 0) + 1
+        if data.get("name"):
+            obj.name = data["name"]
+        if data.get("symbol"):
+            obj.symbol = data["symbol"]
+        if data.get("market_type") is not None:
+            obj.market_type = data["market_type"]
+        db.commit()
+        db.refresh(obj)
+        return obj
+    obj = SearchedSymbol(**{k: v for k, v in data.items() if hasattr(SearchedSymbol, k)})
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def list_searched_symbols(db: Session, limit: int = 200) -> List[SearchedSymbol]:
+    return db.query(SearchedSymbol).order_by(desc(SearchedSymbol.last_searched_at)).limit(limit).all()
