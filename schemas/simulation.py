@@ -106,6 +106,8 @@ class TradeOut(BaseModel):
     fee: float
     cash_after: float
     created_at: datetime
+    # 场外基金申赎的净值确认日（T日/T+1）；股票与场内基金为 null
+    settle_date: Optional[date] = None
 
 
 class PortfolioSummary(BaseModel):

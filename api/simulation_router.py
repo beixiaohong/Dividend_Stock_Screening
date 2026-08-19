@@ -8,6 +8,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import datetime
 
 from core.database import get_db
 from core.auth_dependency import get_current_user
@@ -133,7 +134,18 @@ def get_trades(
     current_user: User = Depends(get_current_user),
 ):
     trades = crud_sim.get_trades(db, current_user.user_id, limit=limit)
-    return trades
+    from services.trade_calendar import fund_settle_date
+    out: list[TradeOut] = []
+    for t in trades:
+        d = t.__dict__.copy()
+        # 场外基金申赎：按下单时间(库内为UTC，换算北京时间)计算净值确认日
+        # 工作日15:00前=T日，之后(含周末任意时间)=下一工作日
+        settle = None
+        if t.asset_type == "fund" and t.market_type == "off" and t.created_at:
+            settle = fund_settle_date(t.created_at + datetime.timedelta(hours=8))
+        d["settle_date"] = settle
+        out.append(TradeOut(**d))
+    return out
 
 
 @router.get("/summary", response_model=PortfolioSummary, summary="账户与持仓汇总")

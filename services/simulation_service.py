@@ -95,6 +95,14 @@ def buy_stock(
     if not shares or shares <= 0:
         raise ValueError("买入股数必须大于 0")
 
+    # 股票仅允许交易时段交易
+    from services.trade_calendar import is_stock_trading_time
+    if not is_stock_trading_time():
+        raise ValueError(
+            "股票仅允许交易时段(工作日 9:30-11:30 / 13:00-15:00)交易，"
+            "请使用基金或等待开盘"
+        )
+
     acc = crud_sim.ensure_account(db, user_id, crud_sim.get_initial_capital(db))
     client = get_client()
 
@@ -151,6 +159,14 @@ def sell_stock(
 ) -> SimStockPosition:
     if not shares or shares <= 0:
         raise ValueError("卖出股数必须大于 0")
+
+    # 股票仅允许交易时段交易
+    from services.trade_calendar import is_stock_trading_time
+    if not is_stock_trading_time():
+        raise ValueError(
+            "股票仅允许交易时段(工作日 9:30-11:30 / 13:00-15:00)交易，"
+            "请使用基金或等待开盘"
+        )
 
     pos = crud_sim.get_stock_position(db, user_id, stock_code)
     if not pos or not pos.is_active or pos.shares < shares:
