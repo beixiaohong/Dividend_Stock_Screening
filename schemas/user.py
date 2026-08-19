@@ -5,7 +5,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     """用户基础模型"""
     account: str = Field(..., min_length=3, max_length=50, description="登录账号")
-    email: str = Field(..., description="邮箱地址")  # 添加 EmailStr 验证
+    email: str = Field("", max_length=255, description="邮箱地址（选填，注册时可留空）")
 
 class UserCreate(UserBase):
     """用户创建模型"""

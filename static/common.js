@@ -79,7 +79,16 @@ const App = (() => {
     try { data = await resp.json(); } catch (e) {}
     if (!resp.ok) {
       const detail = (data && data.detail) ? data.detail : ('请求失败(' + resp.status + ')');
-      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      let msg = detail;
+      if (Array.isArray(detail)) {
+        // FastAPI 422 校验错误数组 -> 可读文案
+        msg = detail.map(it => {
+          const loc = (it.loc || []).filter(x => x !== 'body').join('.');
+          const why = (it.type || '').replace(/_/g, ' ') || (it.msg || '');
+          return (loc ? loc + ': ' : '') + (it.msg || why || '参数错误');
+        }).join('；');
+      }
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
     return data;
   }
