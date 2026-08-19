@@ -57,10 +57,17 @@ async function load() {
     renderAccount(d.account);
     renderStocks(d.stock_positions || [], d.account.total_asset);
     renderFunds(d.fund_positions || [], d.account.total_asset);
+    bindStickyHead(document.getElementById('stock-pos'));
+    bindStickyHead(document.getElementById('fund-pos'));
   } catch (e) {
     if (e.message.indexOf('登录') >= 0) { App.toast('请先登录后再查看持仓'); setTimeout(() => { location.href = '/sim'; }, 600); return; }
     App.toast(e.message);
   }
+}
+
+// 长表格才固定表头（数据少时禁用，避免悬浮表头遮挡内容）
+function bindStickyHead(tbl) {
+  if (tbl) tbl.classList.toggle('sticky-head', tbl.rows.length > 15);
 }
 
 function renderAccount(a) {

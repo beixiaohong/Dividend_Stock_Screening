@@ -190,6 +190,11 @@ function pnlCell(pnl, pct) {
   return `<span class="${cls}">${App.fmtNum(pnl)} (${App.fmtPct(pct)})</span>`;
 }
 
+// 长表格才固定表头（数据少时禁用，避免悬浮表头遮挡内容）
+function bindStickyHead(tbl) {
+  if (tbl) tbl.classList.toggle('sticky-head', tbl.rows.length > 15);
+}
+
 function renderPositions(stocks, funds) {
   const s = document.querySelector('#stock-pos tbody');
   s.innerHTML = stocks.length ? stocks.map(p => `<tr>
@@ -204,6 +209,8 @@ function renderPositions(stocks, funds) {
     <td>${App.fmtNum(p.shares)}</td><td>${App.fmtNum(p.avg_cost)}</td><td>${App.fmtNum(p.current_price)}</td>
     <td>${App.fmtNum(p.market_value)}</td><td>${pnlCell(p.floating_pnl, p.floating_pnl_pct)}</td><td>${App.fmtNum(p.realized_pnl)}</td></tr>`).join('')
     : '<tr><td colspan="9" class="center muted">暂无持仓</td></tr>';
+  bindStickyHead(document.querySelector('#stock-pos'));
+  bindStickyHead(document.querySelector('#fund-pos'));
 }
 
 async function renderTrades() {
@@ -216,6 +223,7 @@ async function renderTrades() {
       <td>${t.code}</td><td>${App.escapeHtml(t.name || '')}</td><td>${App.fmtNum(t.price)}</td>
       <td>${App.fmtNum(t.shares)}</td><td>${App.fmtNum(t.amount)}</td><td>${App.fmtNum(t.fee)}</td><td>${App.fmtNum(t.cash_after)}</td></tr>`).join('')
       : '<tr><td colspan="10" class="center muted">暂无交易</td></tr>';
+    bindStickyHead(document.querySelector('#trades'));
   } catch (e) { App.toast(e.message); }
 }
 

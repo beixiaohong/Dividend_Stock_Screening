@@ -224,7 +224,9 @@ input:focus, select:focus, textarea:focus {
 table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: right; }
 th:first-child, td:first-child { text-align: left; }
-th { color: var(--muted); font-weight: 500; background: var(--panel-2); position: sticky; top: 56px; }
+th { color: var(--muted); font-weight: 500; background: var(--panel-2); }
+/* 长表格(数据多)才固定表头；数据少时禁用，避免悬浮表头遮挡上方内容 */
+.sticky-head th { position: sticky; top: 56px; }
 tbody tr:hover { background: var(--panel-2); }
 .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
 

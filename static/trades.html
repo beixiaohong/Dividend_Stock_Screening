@@ -66,6 +66,11 @@ async function load() {
   }
 }
 
+// 长表格才固定表头（数据少时禁用，避免悬浮表头遮挡内容）
+function bindStickyHead(tbl) {
+  if (tbl) tbl.classList.toggle('sticky-head', tbl.rows.length > 15);
+}
+
 function setFilter(kind, val, btn) {
   if (kind === 'type') fType = val; else fSide = val;
   document.querySelectorAll('[data-group="' + kind + '"]').forEach(b =>
@@ -105,6 +110,7 @@ function render() {
       <td>${App.fmtNum(t.cash_after)}</td>
       <td>${t.settle_date || '—'}</td></tr>`;
   }).join('') : '<tr><td colspan="12" class="center muted">暂无交易记录</td></tr>';
+  bindStickyHead(document.getElementById('trades'));
 }
 
 load();
